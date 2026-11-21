@@ -1,4 +1,8 @@
-import { useNavigation, useRoute } from "@react-navigation/native";
+import {
+    StackActions,
+    useNavigation,
+    useRoute,
+} from "@react-navigation/native";
 import { useCallback } from "react";
 import { LogBox } from "react-native";
 
@@ -133,6 +137,11 @@ export function useNavigate() {
  * 参数、不增加栈深，所以在歌单详情页里点进另一个歌单时，栈里仍然只有
  * 一层 —— 返回会越过列表页落到更早的页面（实测从收藏点歌单返回落到了
  * 听歌排行）。同路由换歌单必须 push，返回才能回到当前这一层。
+ *
+ * push 必须走 dispatch(StackActions.push)：全局浮层面板挂在
+ * NavigationContainer 下、Stack.Navigator 外，那里的 useNavigation 拿到
+ * 的是容器根对象，没有 push 方法（直接调用会抛 TypeError）；dispatch
+ * 在两种上下文里都可用，动作最终都会落到根栈执行。
  */
 export function useOpenSheetDetail() {
     const navigation = useNavigation<any>();
@@ -153,7 +162,9 @@ export function useOpenSheetDetail() {
                 (current?.params as { id?: string } | undefined)?.id !==
                     params.id
             ) {
-                navigation.push(ROUTE_PATH.LOCAL_SHEET_DETAIL, params);
+                navigation.dispatch(
+                    StackActions.push(ROUTE_PATH.LOCAL_SHEET_DETAIL, params),
+                );
                 return;
             }
 

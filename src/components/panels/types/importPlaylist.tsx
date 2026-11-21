@@ -93,12 +93,19 @@ export default function ImportPlaylistPanel() {
                         );
                         // 保存后直接切到新歌单：以前停留在「我的收藏」，
                         // 用户会以为导入的歌单没有生成。匹配面板是全局浮层，
-                        // 切页不会中断后台匹配。
-                        openSheetDetail({
-                            id: sheetId,
-                        });
+                        // 切页不会中断后台匹配。跳转失败只记录、不中断 ——
+                        // 匹配在后台继续，别让用户看到「失败」却拿着一个
+                        // 好好的歌单。
+                        try {
+                            openSheetDetail({
+                                id: sheetId,
+                            });
+                        } catch (e) {
+                            console.warn("[import] 切换到新歌单失败", e);
+                        }
                         showPanel("ImportPlaylistMatch", { sheetId });
-                    } catch {
+                    } catch (e) {
+                        console.warn("[import] 创建歌单失败", e);
                         Toast.warn("创建歌单失败，请重试");
                     }
                 })();
