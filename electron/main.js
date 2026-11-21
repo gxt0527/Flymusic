@@ -76,6 +76,11 @@ const APP_VERSION = require(path.join(ROOT, "package.json")).version;
 
 // 固定应用名，避免数据目录落到默认的 Electron 目录
 app.setName("FlyMusic");
+// FLY_USER_DATA=<目录> 时把 userData 指到别处：调试时与正式实例并存，
+// 不会占用/污染真实数据目录（--user-data-dir 只隔离 Chromium 缓存，隔离不了它）
+if (process.env.FLY_USER_DATA) {
+    app.setPath("userData", process.env.FLY_USER_DATA);
+}
 // 任务栏分组 / 通知归属（与 electron-builder 的 appId 保持一致）
 app.setAppUserModelId("fun.upup.musicfree");
 

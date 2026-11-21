@@ -3,7 +3,7 @@
  */
 import { host } from "../host";
 
-const appVersion = host?.appVersion ?? "1.0.0";
+const appVersion = host?.appVersion ?? "1.0.1";
 
 const DeviceInfo = {
     getApplicationName: () => "Fly音乐",
