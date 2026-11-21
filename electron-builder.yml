@@ -1,0 +1,68 @@
+appId: fun.upup.musicfree
+productName: Fly音乐
+copyright: Copyright © 2026 Fly音乐
+
+directories:
+  # 固定暂存目录，每次原地覆盖；产物由 scripts/publish-win.js 发布到 release-desktop。
+  # 不直接输出到 release-desktop，是因为本机安全软件会长期持住产物里的 app.asar，
+  # 令 electron-builder 无法清空旧 win-unpacked 而中断打包。
+  output: release-stage
+  # 图标等打包资源放这里（不要用 build/，那是 Android 产物目录、已被 gitignore）
+  buildResources: resources
+
+# 不打包成 app.asar，直接输出 resources/app/ 散文件。
+# 原因：本机 360 实时防护会给每个 app.asar 挂常驻句柄（连 .NET File.Delete 都报
+# “正由另一进程使用”），导致同一输出目录无法二次打包。散文件布局没有这个单文件，
+# 可以原地重建；代价是 resources/app/ 下多出 26 个文件，启动开销可忽略。
+asar: false
+
+# 只打包运行必需的文件：Electron 主进程 + 已构建的 web 产物
+files:
+  - electron/**/*
+  - web-dist/**/*
+  - package.json
+  - "!**/*.map"
+  - "!node_modules/**/*"
+
+# 主进程只依赖 Electron 内置模块（fs/path/url/stream），业务代码已全部打进
+# web-dist/index.bundle.js。node_modules 里的 RN 原生包在桌面端毫无用处，
+# 但 electron-builder 默认会把 production dependencies 全塞进 asar（约 195MB）。
+# 显式排除后 asar 只剩几 MB。
+npmRebuild: false
+
+# package.json 的 main 保持指向 RN 入口（否则 Metro 会把 electron/main.js 当模块入口解析），
+# 这里在打包产物里改回 Electron 入口
+extraMetadata:
+  main: electron/main.js
+
+# 运行时资源（托盘图标）放在 asar 外面，Tray/nativeImage 读取更可靠
+extraResources:
+  - from: electron/assets
+    to: assets
+    filter:
+      - "**/*"
+
+win:
+  icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: FlyMusic-${version}-setup.${ext}
+  # 关闭强制签名，本地构建无需证书
+  signAndEditExecutable: true
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Fly音乐
+  # 卸载要干净：用户数据在 %APPDATA%\FlyMusic（app.setName 决定），NSIS 默认不动
+  # %APPDATA%，重装后历史与插件都还在。deleteAppDataOnUninstall 会删
+  # $APPDATA\fly-music —— 和 FlyMusic 是同一个目录（NTFS 不区分大小写），
+  # 但它不管更新下载缓存与历史遗留目录，这部分在 resources/installer.nsh
+  # 的 customUnInstall 里补齐。两条路径在「升级安装」时都会被跳过，不会误删数据。
+  deleteAppDataOnUninstall: true
+  include: resources/installer.nsh

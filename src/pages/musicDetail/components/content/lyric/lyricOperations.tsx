@@ -7,6 +7,7 @@ import { useAppConfig } from "@/core/appConfig";
 import useColors from "@/hooks/useColors";
 import Toast from "@/utils/toast";
 import { hidePanel, showPanel } from "@/components/panels/usePanel";
+import { getPressAnchor } from "@/components/panels/anchor";
 import TrackPlayer from "@/core/trackPlayer";
 import PersistStatus from "@/utils/persistStatus";
 import useOrientation from "@/hooks/useOrientation";
@@ -38,9 +39,10 @@ export default function LyricOperations(props: ILyricOperationsProps) {
                 name="font-size"
                 size={iconSizeConst.normal}
                 color="white"
-                onPress={() => {
+                onPress={e => {
                     showPanel("SetFontSize", {
                         defaultSelect: detailFontSize ?? 1,
+                        anchor: getPressAnchor(e),
                         onSelectChange(value) {
                             PersistStatus.set("lyric.detailFontSize", value);
                             scrollToCurrentLrcItem();
@@ -52,12 +54,13 @@ export default function LyricOperations(props: ILyricOperationsProps) {
                 name="arrows-left-right"
                 size={iconSizeConst.normal}
                 color="white"
-                onPress={() => {
+                onPress={e => {
                     const currentMusicItem = TrackPlayer.currentMusic;
 
                     if (currentMusicItem) {
                         showPanel("SetLyricOffset", {
                             musicItem: currentMusicItem,
+                            anchor: getPressAnchor(e),
                             onSubmit(offset) {
                                 lyricManager.updateLyricOffset(currentMusicItem, offset);
                                 scrollToCurrentLrcItem();

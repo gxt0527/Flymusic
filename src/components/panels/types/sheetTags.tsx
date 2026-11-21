@@ -14,6 +14,10 @@ interface ISheetTagsProps {
     tags: IMusic.IMusicSheetGroupItem[];
     /** 点击tag */
     onTagPressed: (tag: ICommon.IUnique) => void;
+    /** 当前选中分类（桌面端菜单回显用） */
+    selected?: ICommon.IUnique;
+    /** 触发按钮的窗口坐标（桌面端菜单贴按钮展开） */
+    anchor?: { x: number; y: number; width: number; height: number };
 }
 
 export default function SheetTags(props: ISheetTagsProps) {

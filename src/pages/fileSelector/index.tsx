@@ -150,6 +150,18 @@ export default function FileSelector() {
         return true;
     });
 
+    /**
+     * 左上角返回键：有上级目录就上一级，已经到根目录就退出本页。
+     * 之前实现里根目录时按了没反应 —— 桌面端用户会直接卡在这一页。
+     */
+    const goBack = useCallback(() => {
+        if (currentPath.parent !== null) {
+            setCurrentPath(currentPath.parent);
+        } else {
+            navigation.goBack();
+        }
+    }, [currentPath, navigation]);
+
     const selectPath = useCallback(
         (item: IFileItem | IFileItem[], nextChecked: boolean) => {
             if (multi) {
@@ -230,12 +242,7 @@ export default function FileSelector() {
                     sizeType="small"
                     name="arrow-long-left"
                     color={colors.appBarText}
-                    onPress={() => {
-                        // 返回上一级
-                        if (currentPath.parent !== null) {
-                            setCurrentPath(currentPath.parent);
-                        }
-                    }}
+                    onPress={goBack}
                 />
                 <ThemeText
                     numberOfLines={2}

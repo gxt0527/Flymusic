@@ -1,5 +1,4 @@
 import type { ResumeMode, SortType } from "@/constants/commonConst.ts";
-import type { CustomizedColors } from "@/hooks/useColors";
 
 export interface IAppConfigProperties {
     $schema: "2";
@@ -29,6 +28,8 @@ export interface IAppConfigProperties {
     "basic.lazyLoadPlugin": boolean;
     "basic.associateLyricType": "input" | "search";
     "basic.showExitOnNotification": boolean;
+    /** 桌面端关闭按钮行为：隐藏到托盘继续后台运行 / 直接退出 */
+    "basic.closeAction": "tray" | "quit";
     "basic.musicOrderInLocalSheet": SortType;
     "basic.tryChangeSourceWhenPlayFail": boolean;
 
@@ -45,11 +46,6 @@ export interface IAppConfigProperties {
     "lyric.autoSearchLyric": boolean;
 
     // Theme
-    "theme.background": string;
-    "theme.backgroundOpacity": number;
-    "theme.backgroundBlur": number;
-    "theme.colors": CustomizedColors;
-    "theme.customColors"?: CustomizedColors;
     "theme.followSystem": boolean;
     "theme.selectedTheme": string;
 

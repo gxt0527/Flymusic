@@ -7,6 +7,8 @@ import ArchiveBoxXMarkIcon from "@/assets/icons/archive-box-x-mark.svg";
 import ArrowDownTrayIcon from "@/assets/icons/arrow-down-tray.svg";
 import ArrowLeftIcon from "@/assets/icons/arrow-left.svg";
 import ArrowLongLeftIcon from "@/assets/icons/arrow-long-left.svg";
+import ArrowPathRoundedSquareOutlineIcon from "@/assets/icons/arrow-path-rounded-square-outline.svg";
+import ArrowPathRoundedSquareIcon from "@/assets/icons/arrow-path-rounded-square.svg";
 import ArrowPathIcon from "@/assets/icons/arrow-path.svg";
 import ArrowRightEndOnRectangleIcon from "@/assets/icons/arrow-right-end-on-rectangle.svg";
 import ArrowUpTrayIcon from "@/assets/icons/arrow-up-tray.svg";
@@ -14,15 +16,20 @@ import ArrowUturnLeftIcon from "@/assets/icons/arrow-uturn-left.svg";
 import ArrowsLeftRightIcon from "@/assets/icons/arrows-left-right.svg";
 import Bars3Icon from "@/assets/icons/bars-3.svg";
 import BookmarkSquareIcon from "@/assets/icons/bookmark-square.svg";
+import ChartBarOutlineIcon from "@/assets/icons/chart-bar-outline.svg";
+import ChartBarIcon from "@/assets/icons/chart-bar.svg";
 import ChatBubbleOvalLeftEllipsisIcon from "@/assets/icons/chat-bubble-oval-left-ellipsis.svg";
 import CheckCircleOutlineIcon from "@/assets/icons/check-circle-outline.svg";
 import CheckCircleIcon from "@/assets/icons/check-circle.svg";
 import CheckIcon from "@/assets/icons/check.svg";
+import ChevronDownIcon from "@/assets/icons/chevron-down.svg";
+import ChevronRightIcon from "@/assets/icons/chevron-right.svg";
 import CircleStackIcon from "@/assets/icons/circle-stack.svg";
 import ClockOutlineIcon from "@/assets/icons/clock-outline.svg";
+import ClockIcon from "@/assets/icons/clock.svg";
 import CodeBracketSquareIcon from "@/assets/icons/code-bracket-square.svg";
 import Cog8ToothIcon from "@/assets/icons/cog-8-tooth.svg";
-import CrossHairIcon from "@/assets/icons/crosshair.svg";
+import CrosshairIcon from "@/assets/icons/crosshair.svg";
 import DocumentOutlineIcon from "@/assets/icons/document-outline.svg";
 import EllipsisVerticalIcon from "@/assets/icons/ellipsis-vertical.svg";
 import ExclamationCircleIcon from "@/assets/icons/exclamation-circle.svg";
@@ -31,11 +38,13 @@ import FireIcon from "@/assets/icons/fire.svg";
 import FolderMusicOutlineIcon from "@/assets/icons/folder-music-outline.svg";
 import FolderOutlineIcon from "@/assets/icons/folder-outline.svg";
 import FolderPlusIcon from "@/assets/icons/folder-plus.svg";
+import FolderIcon from "@/assets/icons/folder.svg";
 import FontSizeIcon from "@/assets/icons/font-size.svg";
 import HandThumbUpIcon from "@/assets/icons/hand-thumb-up.svg";
 import HeartOutlineIcon from "@/assets/icons/heart-outline.svg";
 import HeartIcon from "@/assets/icons/heart.svg";
 import HomeOutlineIcon from "@/assets/icons/home-outline.svg";
+import HomeIcon from "@/assets/icons/home.svg";
 import IdentificationIcon from "@/assets/icons/identification.svg";
 import InboxArrowDownIcon from "@/assets/icons/inbox-arrow-down.svg";
 import InformationCircleIcon from "@/assets/icons/information-circle.svg";
@@ -58,6 +67,7 @@ import PlayIcon from "@/assets/icons/play.svg";
 import PlaylistIcon from "@/assets/icons/playlist.svg";
 import PlusIcon from "@/assets/icons/plus.svg";
 import PowerOutlineIcon from "@/assets/icons/power-outline.svg";
+import PuzzlePieceIcon from "@/assets/icons/puzzle-piece.svg";
 import QuestionMarkCircleIcon from "@/assets/icons/question-mark-circle.svg";
 import RepeatSong1Icon from "@/assets/icons/repeat-song-1.svg";
 import RepeatSongIcon from "@/assets/icons/repeat-song.svg";
@@ -67,6 +77,7 @@ import ShuffleIcon from "@/assets/icons/shuffle.svg";
 import SkipLeftIcon from "@/assets/icons/skip-left.svg";
 import SkipRightIcon from "@/assets/icons/skip-right.svg";
 import SortOutlineIcon from "@/assets/icons/sort-outline.svg";
+import SpeakerWaveIcon from "@/assets/icons/speaker-wave.svg";
 import StrategyIcon from "@/assets/icons/strategy.svg";
 import TShirtOutlineIcon from "@/assets/icons/t-shirt-outline.svg";
 import TranslationIcon from "@/assets/icons/translation.svg";
@@ -75,80 +86,7 @@ import TrophyIcon from "@/assets/icons/trophy.svg";
 import UserIcon from "@/assets/icons/user.svg";
 import XMarkIcon from "@/assets/icons/x-mark.svg";
 
-export type IIconName =
-    | "alarm-outline"
-    | "album-outline"
-    | "archive-box-x-mark"
-    | "arrow-down-tray"
-    | "arrow-left"
-    | "arrow-long-left"
-    | "arrow-path"
-    | "arrow-right-end-on-rectangle"
-    | "arrow-up-tray"
-    | "arrow-uturn-left"
-    | "arrows-left-right"
-    | "bars-3"
-    | "bookmark-square"
-    | "chat-bubble-oval-left-ellipsis"
-    | "check-circle-outline"
-    | "check-circle"
-    | "check"
-    | "circle-stack"
-    | "clock-outline"
-    | "code-bracket-square"
-    | "cog-8-tooth"
-    | "crosshair"
-    | "document-outline"
-    | "ellipsis-vertical"
-    | "exclamation-circle"
-    | "fire-outline"
-    | "fire"
-    | "folder-music-outline"
-    | "folder-outline"
-    | "folder-plus"
-    | "font-size"
-    | "hand-thumb-up"
-    | "heart-outline"
-    | "heart"
-    | "home-outline"
-    | "identification"
-    | "inbox-arrow-down"
-    | "information-circle"
-    | "javascript"
-    | "language"
-    | "link-slash"
-    | "link"
-    | "lyric"
-    | "magnifying-glass"
-    | "minus"
-    | "motion-play"
-    | "musical-note"
-    | "pause-circle-outline"
-    | "pause"
-    | "pencil-outline"
-    | "pencil-square"
-    | "play-circle-outline"
-    | "play-circle"
-    | "play"
-    | "playlist"
-    | "plus"
-    | "power-outline"
-    | "question-mark-circle"
-    | "repeat-song-1"
-    | "repeat-song"
-    | "share"
-    | "shield-keyhole-outline"
-    | "shuffle"
-    | "skip-left"
-    | "skip-right"
-    | "sort-outline"
-    | "strategy"
-    | "t-shirt-outline"
-    | "translation"
-    | "trash-outline"
-    | "trophy"
-    | "user"
-    | "x-mark";
+export type IIconName = "alarm-outline" | "album-outline" | "archive-box-x-mark" | "arrow-down-tray" | "arrow-left" | "arrow-long-left" | "arrow-path-rounded-square-outline" | "arrow-path-rounded-square" | "arrow-path" | "arrow-right-end-on-rectangle" | "arrow-up-tray" | "arrow-uturn-left" | "arrows-left-right" | "bars-3" | "bookmark-square" | "chart-bar-outline" | "chart-bar" | "chat-bubble-oval-left-ellipsis" | "check-circle-outline" | "check-circle" | "check" | "chevron-down" | "chevron-right" | "circle-stack" | "clock-outline" | "clock" | "code-bracket-square" | "cog-8-tooth" | "crosshair" | "document-outline" | "ellipsis-vertical" | "exclamation-circle" | "fire-outline" | "fire" | "folder-music-outline" | "folder-outline" | "folder-plus" | "folder" | "font-size" | "hand-thumb-up" | "heart-outline" | "heart" | "home-outline" | "home" | "identification" | "inbox-arrow-down" | "information-circle" | "javascript" | "language" | "link-slash" | "link" | "lyric" | "magnifying-glass" | "minus" | "motion-play" | "musical-note" | "pause-circle-outline" | "pause" | "pencil-outline" | "pencil-square" | "play-circle-outline" | "play-circle" | "play" | "playlist" | "plus" | "power-outline" | "puzzle-piece" | "question-mark-circle" | "repeat-song-1" | "repeat-song" | "share" | "shield-keyhole-outline" | "shuffle" | "skip-left" | "skip-right" | "sort-outline" | "speaker-wave" | "strategy" | "t-shirt-outline" | "translation" | "trash-outline" | "trophy" | "user" | "x-mark";
 
 interface IProps extends SvgProps {
     /** 图标名称 */
@@ -164,6 +102,8 @@ const iconMap = {
     "arrow-down-tray": ArrowDownTrayIcon,
     "arrow-left": ArrowLeftIcon,
     "arrow-long-left": ArrowLongLeftIcon,
+    "arrow-path-rounded-square-outline": ArrowPathRoundedSquareOutlineIcon,
+    "arrow-path-rounded-square": ArrowPathRoundedSquareIcon,
     "arrow-path": ArrowPathIcon,
     "arrow-right-end-on-rectangle": ArrowRightEndOnRectangleIcon,
     "arrow-up-tray": ArrowUpTrayIcon,
@@ -171,78 +111,87 @@ const iconMap = {
     "arrows-left-right": ArrowsLeftRightIcon,
     "bars-3": Bars3Icon,
     "bookmark-square": BookmarkSquareIcon,
+    "chart-bar-outline": ChartBarOutlineIcon,
+    "chart-bar": ChartBarIcon,
     "chat-bubble-oval-left-ellipsis": ChatBubbleOvalLeftEllipsisIcon,
     "check-circle-outline": CheckCircleOutlineIcon,
     "check-circle": CheckCircleIcon,
-    check: CheckIcon,
+    "check": CheckIcon,
+    "chevron-down": ChevronDownIcon,
+    "chevron-right": ChevronRightIcon,
     "circle-stack": CircleStackIcon,
     "clock-outline": ClockOutlineIcon,
+    "clock": ClockIcon,
     "code-bracket-square": CodeBracketSquareIcon,
     "cog-8-tooth": Cog8ToothIcon,
-    crosshair: CrossHairIcon,
+    "crosshair": CrosshairIcon,
     "document-outline": DocumentOutlineIcon,
     "ellipsis-vertical": EllipsisVerticalIcon,
     "exclamation-circle": ExclamationCircleIcon,
     "fire-outline": FireOutlineIcon,
-    fire: FireIcon,
+    "fire": FireIcon,
     "folder-music-outline": FolderMusicOutlineIcon,
     "folder-outline": FolderOutlineIcon,
     "folder-plus": FolderPlusIcon,
+    "folder": FolderIcon,
     "font-size": FontSizeIcon,
     "hand-thumb-up": HandThumbUpIcon,
     "heart-outline": HeartOutlineIcon,
-    heart: HeartIcon,
+    "heart": HeartIcon,
     "home-outline": HomeOutlineIcon,
-    identification: IdentificationIcon,
+    "home": HomeIcon,
+    "identification": IdentificationIcon,
     "inbox-arrow-down": InboxArrowDownIcon,
     "information-circle": InformationCircleIcon,
-    javascript: JavascriptIcon,
+    "javascript": JavascriptIcon,
+    "language": LanguageIcon,
     "link-slash": LinkSlashIcon,
-    link: LinkIcon,
-    language: LanguageIcon,
-    lyric: LyricIcon,
+    "link": LinkIcon,
+    "lyric": LyricIcon,
     "magnifying-glass": MagnifyingGlassIcon,
-    minus: MinusIcon,
+    "minus": MinusIcon,
     "motion-play": MotionPlayIcon,
     "musical-note": MusicalNoteIcon,
     "pause-circle-outline": PauseCircleOutlineIcon,
-    pause: PauseIcon,
+    "pause": PauseIcon,
     "pencil-outline": PencilOutlineIcon,
     "pencil-square": PencilSquareIcon,
     "play-circle-outline": PlayCircleOutlineIcon,
     "play-circle": PlayCircleIcon,
-    play: PlayIcon,
-    playlist: PlaylistIcon,
-    plus: PlusIcon,
+    "play": PlayIcon,
+    "playlist": PlaylistIcon,
+    "plus": PlusIcon,
     "power-outline": PowerOutlineIcon,
+    "puzzle-piece": PuzzlePieceIcon,
     "question-mark-circle": QuestionMarkCircleIcon,
     "repeat-song-1": RepeatSong1Icon,
     "repeat-song": RepeatSongIcon,
-    share: ShareIcon,
+    "share": ShareIcon,
     "shield-keyhole-outline": ShieldKeyholeOutlineIcon,
-    shuffle: ShuffleIcon,
+    "shuffle": ShuffleIcon,
     "skip-left": SkipLeftIcon,
     "skip-right": SkipRightIcon,
     "sort-outline": SortOutlineIcon,
-    strategy: StrategyIcon,
+    "speaker-wave": SpeakerWaveIcon,
+    "strategy": StrategyIcon,
     "t-shirt-outline": TShirtOutlineIcon,
-    translation: TranslationIcon,
+    "translation": TranslationIcon,
     "trash-outline": TrashOutlineIcon,
-    trophy: TrophyIcon,
-    user: UserIcon,
+    "trophy": TrophyIcon,
+    "user": UserIcon,
     "x-mark": XMarkIcon,
 } as const;
 
 export default function Icon(props: IProps) {
     const { name, size } = props;
-
+    
     const newProps = {
         ...props,
         width: props.width ?? size,
         height: props.width ?? size,
     } as SvgProps;
-
+    
     const Component = iconMap[name];
-
+    
     return <Component {...newProps} />;
 }

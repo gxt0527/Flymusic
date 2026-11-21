@@ -138,6 +138,8 @@ async function setupFolder() {
         checkAndCreateDir(pathConst.logPath),
         checkAndCreateDir(pathConst.cachePath),
         checkAndCreateDir(pathConst.pluginPath),
+        checkAndCreateDir(pathConst.musicCachePath),
+        checkAndCreateDir(pathConst.imageCachePath),
         checkAndCreateDir(pathConst.lrcCachePath),
         checkAndCreateDir(pathConst.downloadCachePath),
         checkAndCreateDir(pathConst.localLrcPath),
@@ -259,7 +261,6 @@ async function extraMakeup() {
                 const musicItem = await PluginManager.getByHash(
                     localPluginHash,
                 )?.instance?.importMusicItem?.(url);
-                console.log(musicItem);
                 if (musicItem) {
                     TrackPlayer.play(musicItem);
                 }
@@ -324,6 +325,5 @@ export default async function () {
         }
     }
     // 隐藏开屏动画
-    console.log("HIDE");
     await SplashScreen.hideAsync();
 }

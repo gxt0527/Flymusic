@@ -4,6 +4,7 @@ import rpx from "@/utils/rpx";
 import ThemeText from "@/components/base/themeText";
 
 import PanelBase from "../base/panelBase";
+import type { IPanelAnchor } from "../anchor";
 import { iconSizeConst } from "@/constants/uiConst";
 import PanelHeader from "../base/panelHeader";
 import { TouchableOpacity } from "react-native-gesture-handler";
@@ -15,6 +16,10 @@ import { useI18N } from "@/core/i18n";
 
 interface IProps {
     musicItem: IMusic.IMusicItem;
+    /** 桌面端：挂在触发按钮上展开（移动端忽略） */
+    anchor?: IPanelAnchor;
+    /** 桌面端：常驻深色页面上强制深色菜单 */
+    dark?: boolean;
     /** 点击回调 */
     onSubmit?: (offset: number) => void;
 }

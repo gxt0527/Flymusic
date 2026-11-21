@@ -43,7 +43,8 @@ export default function useColors() {
     const cColors: CustomizedColors = useMemo(() => {
         return {
             ...colors,
-            textSecondary: Color(colors.text).alpha(0.7).toString(),
+            // 0.55 在 #101213 / #1F2122 / #2A2A2A 三档背景上合成结果都落在 #93–#9F，与设计稿 #9A9A9A 吻合
+            textSecondary: Color(colors.text).alpha(0.55).toString(),
             // @ts-ignore
             background: colors.pageBackground ?? colors.background,
         };

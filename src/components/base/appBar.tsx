@@ -1,12 +1,11 @@
-import React, { ReactNode, useEffect, useState } from "react";
+import React, { ReactNode } from "react";
 import {
-    LayoutRectangle,
-    StatusBar as OriginalStatusBar,
+    Platform,
     StyleProp,
     StyleSheet,
-    TouchableWithoutFeedback,
     View,
     ViewStyle,
+    useWindowDimensions,
 } from "react-native";
 import rpx from "@/utils/rpx";
 import useColors from "@/hooks/useColors";
@@ -17,14 +16,13 @@ import globalStyle from "@/constants/globalStyle";
 import ThemeText from "./themeText";
 import { useNavigation } from "@react-navigation/native";
 import Animated, {
-    Easing,
+    SharedValue,
+    interpolate,
     useAnimatedStyle,
-    useSharedValue,
-    withTiming,
 } from "react-native-reanimated";
-import Portal from "./portal";
-import ListItem from "./listItem";
 import { IIconName } from "@/components/base/icon.tsx";
+import MenuButton, { IMenuOption } from "./menuButton";
+import { breakpoint } from "@/theme";
 
 interface IAppBarProps {
     titleTextOpacity?: number;
@@ -34,27 +32,18 @@ interface IAppBarProps {
         icon: IIconName;
         onPress?: () => void;
     }>;
-    menu?: Array<{
-        icon: IIconName;
-        title: string;
-        show?: boolean;
-        onPress?: () => void;
-    }>;
-    menuWithStatusBar?: boolean;
+    menu?: IMenuOption[];
     children?: string | ReactNode;
     containerStyle?: StyleProp<ViewStyle>;
     contentStyle?: StyleProp<ViewStyle>;
     actionComponent?: ReactNode;
     onBackPress?: () => void;
+    /**
+     * 列表滚动进度（0~1）。给了就把大标题按进度向上收起并淡出，
+     * 用于「我的收藏」这类需要折叠头部的页面；不给则标题恒定显示。
+     */
+    collapseProgress?: SharedValue<number>;
 }
-
-const ANIMATION_EASING: Animated.EasingFunction = Easing.out(Easing.exp);
-const ANIMATION_DURATION = 500;
-
-const timingConfig = {
-    duration: ANIMATION_DURATION,
-    easing: ANIMATION_EASING,
-};
 
 export default function AppBar(props: IAppBarProps) {
     const {
@@ -63,75 +52,109 @@ export default function AppBar(props: IAppBarProps) {
         color: _color,
         actions = [],
         menu = [],
-        menuWithStatusBar = true,
         containerStyle,
         contentStyle,
         children,
         actionComponent,
         onBackPress,
+        collapseProgress,
     } = props;
 
     const colors = useColors();
     const navigation = useNavigation();
+    const { width: windowWidth } = useWindowDimensions();
+    const isDesktop = Platform.OS === "web" && windowWidth >= breakpoint.compact;
+    /**
+     * 窄屏（底部 Tab）恒显示返回键；桌面侧栏常驻，一级页不需要返回。
+     * 桌面端的返回键统一挪到了全局顶栏搜索框左侧（见 layout/desktopTopBar），
+     * 页内不再重复一个 —— 只有浮层（编辑歌单信息、评论）自己传 onBackPress，
+     * 那种场景下必须保留，否则浮层没有关闭入口。
+     */
+    const showBack = windowWidth < breakpoint.compact || !!onBackPress;
 
     const bgColor = color(colors.appBar ?? colors.primary).toString();
     const contentColor = _color ?? colors.appBarText;
 
-    const [showMenu, setShowMenu] = useState(false);
-    const [menuIconLayout, setMenuIconLayout] =
-        useState<LayoutRectangle | null>(null);
-    const scaleRate = useSharedValue(0);
-
-    useEffect(() => {
-        if (showMenu) {
-            scaleRate.value = withTiming(1, timingConfig);
-        } else {
-            scaleRate.value = withTiming(0, timingConfig);
-        }
-    }, [showMenu]);
-
-    const transformStyle = useAnimatedStyle(() => {
+    /** 标题收起：向上位移 + 淡出，滚动越深收得越干净 */
+    const titleCollapseStyle = useAnimatedStyle(() => {
+        const progress = collapseProgress ? collapseProgress.value : 0;
         return {
-            opacity: scaleRate.value,
+            opacity: interpolate(progress, [0, 1], [1, 0]),
+            transform: [
+                { translateY: interpolate(progress, [0, 1], [0, -14]) },
+            ],
+        };
+    });
+
+    /**
+     * 标题收起后整条也跟着收：一直收到 0，标题行彻底让出高度。
+     * 歌单内搜索与 ⋮ 已经移到操作行，标题栏里没有别的东西要留，不必留最小高度。
+     */
+    const barCollapseStyle = useAnimatedStyle(() => {
+        const progress = collapseProgress ? collapseProgress.value : 0;
+        return {
+            height: interpolate(progress, [0, 1], [52, 0]),
+            overflow: "hidden" as const,
         };
     });
 
     return (
         <>
             {withStatusBar ? <StatusBar backgroundColor={bgColor} /> : null}
-            <View
+            <Animated.View
                 style={[
                     styles.container,
+                    isDesktop && styles.containerDesktop,
                     containerStyle,
-                    { backgroundColor: bgColor },
+                    { backgroundColor: isDesktop ? "transparent" : bgColor },
+                    collapseProgress ? barCollapseStyle : null,
                 ]}>
-                <IconButton
-                    name="arrow-left"
-                    sizeType="normal"
-                    color={contentColor}
-                    style={globalStyle.notShrink}
-                    onPress={
-                        onBackPress ||
-                        (() => {
-                            navigation.goBack();
-                        })
-                    }
-                />
-                <View style={[globalStyle.grow, styles.content, contentStyle]}>
+                {showBack ? (
+                    <IconButton
+                        accessibilityLabel="返回"
+                        name="arrow-left"
+                        sizeType="normal"
+                        color={contentColor}
+                        style={[
+                            globalStyle.notShrink,
+                            isDesktop ? { marginRight: 10 } : null,
+                        ]}
+                        onPress={
+                            onBackPress ||
+                            (() => {
+                                navigation.goBack();
+                            })
+                        }
+                    />
+                ) : null}
+                <View
+                    style={[
+                        globalStyle.grow,
+                        styles.content,
+                        isDesktop && styles.contentDesktop,
+                        contentStyle,
+                    ]}>
                     {typeof children === "string" ? (
-                        <ThemeText
-                            fontSize="title"
-                            fontWeight="bold"
-                            numberOfLines={1}
-                            color={
-                                titleTextOpacity !== 1
-                                    ? color(contentColor)
-                                        .alpha(titleTextOpacity)
-                                        .toString()
-                                    : contentColor
-                            }>
-                            {children}
-                        </ThemeText>
+                        <Animated.View
+                            style={[styles.titleHost, titleCollapseStyle]}
+                            pointerEvents="none">
+                            <ThemeText
+                                fontSize="title"
+                                fontWeight="bold"
+                                numberOfLines={1}
+                                style={
+                                    isDesktop ? styles.titleDesktop : undefined
+                                }
+                                color={
+                                    titleTextOpacity !== 1
+                                        ? color(contentColor)
+                                            .alpha(titleTextOpacity)
+                                            .toString()
+                                        : contentColor
+                                }>
+                                {children}
+                            </ThemeText>
+                        </Animated.View>
                     ) : (
                         children
                     )}
@@ -147,90 +170,14 @@ export default function AppBar(props: IAppBarProps) {
                     />
                 ))}
                 {actionComponent ?? null}
-                {menu?.length ? (
-                    <IconButton
-                        name="ellipsis-vertical"
-                        sizeType="normal"
-                        onLayout={evt => {
-                            setMenuIconLayout(evt.nativeEvent.layout);
-                        }}
-                        color={contentColor}
-                        style={[globalStyle.notShrink, styles.rightButton]}
-                        onPress={() => {
-                            setShowMenu(true);
-                        }}
-                    />
-                ) : null}
-            </View>
-            <Portal>
-                {showMenu ? (
-                    <TouchableWithoutFeedback
-                        onPress={() => {
-                            setShowMenu(false);
-                        }}>
-                        <View style={styles.blocker} />
-                    </TouchableWithoutFeedback>
-                ) : null}
-                <>
-                    <Animated.View
-                        pointerEvents={showMenu ? "auto" : "none"}
-                        style={[
-                            {
-                                borderBottomColor: colors.background,
-                                left:
-                                    (menuIconLayout?.x ?? 0) +
-                                    (menuIconLayout?.width ?? 0) / 2 -
-                                    rpx(10),
-                                top:
-                                    (menuIconLayout?.y ?? 0) +
-                                    (menuIconLayout?.height ?? 0) +
-                                    (menuWithStatusBar
-                                        ? OriginalStatusBar.currentHeight ?? 0
-                                        : 0),
-                            },
-                            transformStyle,
-                            styles.bubbleCorner,
-                        ]}
-                    />
-                    <Animated.View
-                        pointerEvents={showMenu ? "auto" : "none"}
-                        style={[
-                            {
-                                backgroundColor: colors.background,
-                                right: rpx(24),
-                                top:
-                                    (menuIconLayout?.y ?? 0) +
-                                    (menuIconLayout?.height ?? 0) +
-                                    rpx(20) +
-                                    (menuWithStatusBar
-                                        ? OriginalStatusBar.currentHeight ?? 0
-                                        : 0),
-                                shadowColor: colors.shadow,
-                            },
-                            transformStyle,
-                            styles.menu,
-                        ]}>
-                        {menu.map(it =>
-                            it.show !== false ? (
-                                <ListItem
-                                    key={it.title}
-                                    withHorizontalPadding
-                                    heightType="small"
-                                    onPress={() => {
-                                        setShowMenu(false);
-                                        // async
-                                        setTimeout(() => {
-                                            it.onPress?.();
-                                        }, 20);
-                                    }}>
-                                    <ListItem.ListItemIcon icon={it.icon} />
-                                    <ListItem.Content title={it.title} />
-                                </ListItem>
-                            ) : null,
-                        )}
-                    </Animated.View>
-                </>
-            </Portal>
+                <MenuButton
+                    menu={menu}
+                    color={contentColor}
+                    style={[globalStyle.notShrink, styles.rightButton]}
+                />
+                {/* 桌面：顶栏的齿轮与窗口控件由 DesktopTopBar 统一提供，
+                    这里不再重复渲染，AppBar 在桌面退化为「页内标题」 */}
+            </Animated.View>
         </>
     );
 }
@@ -244,6 +191,27 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: rpx(24),
     },
+    containerDesktop: {
+        /** 桌面：不再是一条通栏标题条，而是内容区里的页内标题 */
+        height: 52,
+        paddingHorizontal: 20,
+        alignItems: "center",
+    },
+    contentDesktop: {
+        paddingHorizontal: 0,
+    },
+    /** 标题的动画容器：占满剩余宽度，让 numberOfLines 的省略号仍按整行算 */
+    titleHost: {
+        flexGrow: 1,
+        flexShrink: 1,
+        flexBasis: 0,
+        minWidth: 0,
+    },
+    titleDesktop: {
+        fontSize: 19,
+        lineHeight: 26,
+        fontWeight: "600",
+    },
     content: {
         flexDirection: "row",
         flexBasis: 0,
@@ -252,36 +220,5 @@ const styles = StyleSheet.create({
     },
     rightButton: {
         marginLeft: rpx(28),
-    },
-    blocker: {
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        zIndex: 10010,
-    },
-    bubbleCorner: {
-        position: "absolute",
-        borderColor: "transparent",
-        borderWidth: rpx(10),
-        zIndex: 10012,
-        transformOrigin: "right top",
-        opacity: 0,
-    },
-    menu: {
-        width: rpx(340),
-        maxHeight: rpx(600),
-        borderRadius: rpx(8),
-        zIndex: 10011,
-        position: "absolute",
-        opacity: 0,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.23,
-        shadowRadius: 2.62,
-        elevation: 4,
     },
 });

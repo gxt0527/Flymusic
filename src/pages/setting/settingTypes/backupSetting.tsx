@@ -13,6 +13,10 @@ import { ResumeMode } from "@/constants/commonConst.ts";
 import Config, { useAppConfig } from "@/core/appConfig";
 import { useI18N } from "@/core/i18n";
 import delay from "@/utils/delay";
+import {
+    hasNativeDirectoryPicker,
+    pickDirectory,
+} from "@/utils/directoryPicker";
 import { writeInChunks } from "@/utils/fileUtils.ts";
 import { errorLog } from "@/utils/log.ts";
 import { getDocumentAsync } from "expo-document-picker";
@@ -30,39 +34,59 @@ export default function BackupSetting() {
 
 
     const onBackupToLocal = async () => {
+        const writeBackup = (folder?: string) => {
+            const raw = Backup.backup();
+            return new Promise(resolve => {
+                showDialog("LoadingDialog", {
+                    title: t("backupAndResume.backupDialogTitle"),
+                    loadingText: t("backupAndResume.backuping"),
+                    promise: writeInChunks(
+                        `${folder}${folder?.endsWith("/") || folder?.endsWith("\\") ? "" : "/"
+                        }backup.json`,
+                        raw,
+                    ),
+                    onResolve(_, hideDialog) {
+                        Toast.success(t("toast.backupSuccess"));
+                        hideDialog();
+                        resolve(true);
+                    },
+                    onCancel(hideDialog) {
+                        hideDialog();
+                        resolve(false);
+                    },
+                    onReject(reason, hideDialog) {
+                        hideDialog();
+                        resolve(false);
+                        console.log(reason);
+                        Toast.warn(t("toast.backupFail", { reason: reason?.message ?? reason }));
+                    },
+                });
+            });
+        };
+
+        // 桌面端：直接弹 Windows 原生的「选择文件夹」
+        if (hasNativeDirectoryPicker) {
+            const picked = await pickDirectory({
+                title: t("backupAndResume.backupDialogTitle"),
+                buttonLabel: t("backupAndResume.beginBackup"),
+            });
+            if (picked && picked.length) {
+                return writeBackup(picked[0]);
+            }
+            if (picked !== null) {
+                // 用户取消
+                return;
+            }
+        }
+
         navigate(ROUTE_PATH.FILE_SELECTOR, {
             fileType: "folder",
             multi: false,
             actionText: t("backupAndResume.beginBackup"),
             async onAction(selectedFiles) {
-                const raw = Backup.backup();
                 const folder = selectedFiles[0]?.path;
-                return new Promise(resolve => {
-                    showDialog("LoadingDialog", {
-                        title: t("backupAndResume.backupDialogTitle"),
-                        loadingText: t("backupAndResume.backuping"),
-                        promise: writeInChunks(
-                            `${folder}${folder?.endsWith("/") ? "" : "/"
-                            }backup.json`,
-                            raw,
-                        ),
-                        onResolve(_, hideDialog) {
-                            Toast.success(t("toast.backupSuccess"));
-                            hideDialog();
-                            resolve(true);
-                        },
-                        onCancel(hideDialog) {
-                            hideDialog();
-                            resolve(false);
-                        },
-                        onReject(reason, hideDialog) {
-                            hideDialog();
-                            resolve(false);
-                            console.log(reason);
-                            Toast.warn(t("toast.backupFail", { reason: reason?.message ?? reason }));
-                        },
-                    });
-                });
+                const done = await writeBackup(folder);
+                return !!done;
             },
         });
     };

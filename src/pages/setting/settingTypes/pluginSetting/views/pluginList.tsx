@@ -15,12 +15,14 @@ import Empty from "@/components/base/empty";
 import HorizontalSafeAreaView from "@/components/base/horizontalSafeAreaView.tsx";
 import { showDialog } from "@/components/dialogs/useDialog";
 import { showPanel } from "@/components/panels/usePanel";
+import { getPressAnchor } from "@/components/panels/anchor";
 import AppBar from "@/components/base/appBar";
 import Fab from "@/components/base/fab";
 import PluginItem from "../components/pluginItem";
 import { IIconName } from "@/components/base/icon.tsx";
 import { IInstallPluginResult } from "@/types/core/pluginManager";
 import { useI18N } from "@/core/i18n";
+import { useLayoutMode } from "@/components/layout";
 
 interface IOption {
     icon: IIconName;
@@ -35,15 +37,10 @@ export default function PluginList() {
     const [loading, setLoading] = useState(false);
 
     const navigator = useNavigation<any>();
+    // 桌面端把「+」放进页内标题栏，避免右下角悬浮按钮压住插件卡的启用开关
+    const isDesktop = useLayoutMode() !== "tab";
 
     const menuOptions: IOption[] = [
-        {
-            icon: "bookmark-square",
-            title: t("pluginSetting.menu.subscriptionSetting"),
-            async onPress() {
-                navigator.navigate("/pluginsetting/subscribe");
-            },
-        },
         {
             icon: "bars-3",
             title: t("pluginSetting.menu.sort"),
@@ -150,71 +147,6 @@ export default function PluginList() {
         });
     }
 
-    async function onSubscribeClick() {
-        const urls = Config.getConfig("plugin.subscribeUrl");
-        if (!urls) {
-            Toast.warn(t("toast.noSubscription"));
-        }
-        setLoading(true);
-
-        const successResults: IInstallPluginResult[] = [];
-        const failResults: IInstallPluginResult[] = [];
-
-        try {
-            const urlItems = JSON.parse(urls!);
-            if (Array.isArray(urlItems)) {
-                for (let i = 0; i < urlItems.length; ++i) {
-                    const result = await installPluginFromUrl(urlItems[i].url);
-                    if (result[0]) {
-                        if (result[0].success) {
-                            successResults.push(result[0]);
-                        } else {
-                            failResults.push(result[0]);
-                        }
-                    }
-                }
-            } else {
-                throw new Error();
-            }
-
-            if (!failResults.length) {
-                Toast.success(t("toast.installPluginSuccess"));
-            } else {
-                Toast.warn((successResults.length ? t("toast.partialPluginInstallFailed") : t("toast.allPluginInstallFailed")), {
-                    "type": "warn",
-                    "actionText": t("common.view"),
-                    "onActionClick": () => {
-                        showDialog("SimpleDialog", {
-                            title: t("pluginSetting.menu.pluginInstallFailedDialogTitle"),
-                            content: t("pluginSetting.pluginInstallFailedDialogContent", {
-                                detail: failResults.map(it => (it.pluginUrl ?? "") + "\n" + t("pluginSetting.failReason", {
-                                    reason: it.message ?? "",
-                                })).join("\n-----\n"),
-                            }),
-                        });
-                    },
-                });
-            }
-
-        } catch {
-            if (urls?.length) {
-                const result = await installPluginFromUrl(urls);
-                if (result[0]) {
-                    if (result[0].success) {
-                        Toast.success(t("toast.installPluginSuccess"));
-                    } else {
-                        Toast.warn(t("toast.partialPluginInstallFailedWithReason", {
-                            reason: result[0].message ?? "",
-                        }));
-                    }
-                } else {
-                    Toast.warn(t("toast.subscriptionInvalid"));
-                }
-            }
-        }
-        setLoading(false);
-    }
-
     async function onUpdateAllClick() {
         const plugins = PluginManager.getEnabledPlugins();
         setLoading(true);
@@ -264,9 +196,48 @@ export default function PluginList() {
         setLoading(false);
     }
 
+    /** 安装/更新入口：桌面走标题栏「+」，移动端走悬浮按钮 */
+    function openInstallMenu(e?: unknown) {
+        showPanel("SimpleSelect", {
+            header: t("pluginSetting.menu.installPlugin"),
+            anchor: getPressAnchor(e),
+            candidates: [
+                {
+                    value: "从本地安装插件",
+                    title: t("pluginSetting.fabOptions.installFromLocal"),
+                },
+                {
+                    value: "从网络安装插件",
+                    title: t("pluginSetting.fabOptions.installFromNetwork"),
+                },
+                {
+                    value: "更新全部插件",
+                    title: t("pluginSetting.fabOptions.updateAllPlugins"),
+                },
+            ],
+            onPress(item) {
+                if (item.value === "从本地安装插件") {
+                    onInstallFromLocalClick();
+                } else if (item.value === "从网络安装插件") {
+                    onInstallFromNetworkClick();
+                } else if (item.value === "更新全部插件") {
+                    onUpdateAllClick();
+                }
+            },
+        });
+    }
+
     return (
         <>
-            <AppBar menu={menuOptions}>{t("sidebar.pluginManagement")}</AppBar>
+            <AppBar
+                menu={menuOptions}
+                actions={
+                    isDesktop
+                        ? [{ icon: "plus" as IIconName, onPress: openInstallMenu }]
+                        : []
+                }>
+                {t("sidebar.pluginManagement")}
+            </AppBar>
             <HorizontalSafeAreaView style={style.wrapper}>
                 <>
                     {loading ? (
@@ -274,7 +245,11 @@ export default function PluginList() {
                     ) : (
                         <FlatList
                             ListEmptyComponent={Empty}
-                            ListFooterComponent={<View style={style.blank} />}
+                            ListFooterComponent={
+                                <View
+                                    style={[style.blank, isDesktop && style.blankDesktop]}
+                                />
+                            }
                             data={plugins ?? []}
                             keyExtractor={_ => _.hash}
                             renderItem={({ item: plugin }) => (
@@ -283,45 +258,9 @@ export default function PluginList() {
                         />
                     )}
 
-                    <Fab
-                        icon="plus"
-                        onPress={() => {
-                            showPanel("SimpleSelect", {
-                                header: t("pluginSetting.menu.installPlugin"),
-                                candidates: [
-                                    {
-                                        value: "从本地安装插件",
-                                        title: t("pluginSetting.fabOptions.installFromLocal"),
-                                    },
-                                    {
-                                        value: "从网络安装插件",
-                                        title: t("pluginSetting.fabOptions.installFromNetwork"),
-                                    },
-                                    {
-                                        value: "更新全部插件",
-                                        title: t("pluginSetting.fabOptions.updateAllPlugins"),
-                                    },
-                                    {
-                                        value: "更新订阅",
-                                        title: t("pluginSetting.fabOptions.updateSubscription"),
-                                    },
-                                ],
-                                onPress(item) {
-                                    if (item.value === "从本地安装插件") {
-                                        onInstallFromLocalClick();
-                                    } else if (
-                                        item.value === "从网络安装插件"
-                                    ) {
-                                        onInstallFromNetworkClick();
-                                    } else if (item.value === "更新订阅") {
-                                        onSubscribeClick();
-                                    } else if (item.value === "更新全部插件") {
-                                        onUpdateAllClick();
-                                    }
-                                },
-                            });
-                        }}
-                    />
+                    {isDesktop ? null : (
+                        <Fab icon="plus" onPress={openInstallMenu} />
+                    )}
                 </>
             </HorizontalSafeAreaView>
         </>
@@ -335,6 +274,10 @@ const style = StyleSheet.create({
     },
     blank: {
         height: rpx(200),
+    },
+    /** 桌面没有悬浮按钮，不需要为它留出一大段空白 */
+    blankDesktop: {
+        height: 24,
     },
 });
 

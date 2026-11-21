@@ -42,8 +42,6 @@ export const ROUTE_PATH = {
     PLUGIN_SHEET_DETAIL: "plugin-sheet-detail",
     /** 历史记录 */
     HISTORY: "history",
-    /** 自定义主题 */
-    SET_CUSTOM_THEME: "set-custom-theme",
     /** 权限管理 */
     PERMISSIONS: "permissions",
 } as const;
@@ -125,4 +123,42 @@ export function useNavigate() {
     []);
 
     return navigate;
+}
+
+/**
+ * 打开本地歌单详情。
+ *
+ * 所有本地歌单共用 `local-sheet-detail` 这一个路由，靠 params.id 区分
+ * （「我的收藏」就是 id=favorite 的那一层）。`navigate` 对同名路由只更新
+ * 参数、不增加栈深，所以在歌单详情页里点进另一个歌单时，栈里仍然只有
+ * 一层 —— 返回会越过列表页落到更早的页面（实测从收藏点歌单返回落到了
+ * 听歌排行）。同路由换歌单必须 push，返回才能回到当前这一层。
+ */
+export function useOpenSheetDetail() {
+    const navigation = useNavigation<any>();
+
+    return useCallback(
+        (params: RouterParams["local-sheet-detail"]) => {
+            let routes: any[] = [];
+            let index = 0;
+            try {
+                const state = navigation.getState();
+                routes = state?.routes ?? [];
+                index = state?.index ?? routes.length - 1;
+            } catch {}
+
+            const current = routes[index];
+            if (
+                current?.name === ROUTE_PATH.LOCAL_SHEET_DETAIL &&
+                (current?.params as { id?: string } | undefined)?.id !==
+                    params.id
+            ) {
+                navigation.push(ROUTE_PATH.LOCAL_SHEET_DETAIL, params);
+                return;
+            }
+
+            navigation.navigate(ROUTE_PATH.LOCAL_SHEET_DETAIL, params);
+        },
+        [navigation],
+    );
 }

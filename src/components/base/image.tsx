@@ -1,5 +1,7 @@
 import React from "react";
-import { Image, ImageProps } from "react-native";
+import { ImageProps } from "react-native";
+
+import FadeImage from "./fadeImage";
 
 interface IImageProps extends ImageProps {
     uri?: string | null;
@@ -12,5 +14,5 @@ export default function (props: Omit<IImageProps, "source">) {
             uri,
         }
         : emptySrc;
-    return <Image {...props} source={source} />;
+    return <FadeImage {...props} source={source} />;
 }

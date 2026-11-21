@@ -31,6 +31,7 @@ export default function SheetMusicList(props: IMusicListProps) {
                 <HorizontalSafeAreaView style={globalStyle.fwflex1}>
                     <MusicList
                         showIndex
+                        desktopTable
                         Header={
                             <Header
                                 canStar={canStar}

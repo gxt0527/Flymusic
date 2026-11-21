@@ -2,7 +2,6 @@ import Config from "@/core/appConfig";
 
 import { DarkTheme as _DarkTheme, DefaultTheme as _DefaultTheme } from "@react-navigation/native";
 import { GlobalState } from "@/utils/stateMapper";
-import { CustomizedColors } from "@/hooks/useColors";
 import Color from "color";
 
 export const lightTheme = {
@@ -11,26 +10,26 @@ export const lightTheme = {
     colors: {
         ..._DefaultTheme.colors,
         background: "transparent",
-        text: "#333333",
-        textSecondary: Color("#333333").alpha(0.7).toString(),
-        primary: "#f17d34",
-        pageBackground: "#fafafa",
+        text: "#1A1A1A",
+        textSecondary: Color("#1A1A1A").alpha(0.55).toString(),
+        primary: "#1FA97C",
+        pageBackground: "#FAFAFA",
         shadow: "#000",
-        appBar: "#f17d34",
-        appBarText: "#fefefe",
-        musicBar: "#f2f2f2",
-        musicBarText: "#333333",
-        divider: "rgba(0,0,0,0.1)",
-        listActive: "rgba(0,0,0,0.1)", // 在手机上表现是ripple
-        mask: "rgba(51,51,51,0.2)",
-        backdrop: "#f0f0f0",
-        tabBar: "#f0f0f0",
-        placeholder: "#eaeaea",
-        success: "#08A34C",
-        danger: "#FC5F5F",
-        info: "#0A95C8",
-        card: "#e2e2e288",
-        notification: "#f0f0f0",
+        appBar: "#FAFAFA",
+        appBarText: "#1A1A1A",
+        musicBar: "#FFFFFF",
+        musicBarText: "#1A1A1A",
+        divider: "rgba(0,0,0,0.08)",
+        listActive: "rgba(0,0,0,0.05)", // 在手机上表现是ripple
+        mask: "rgba(51,51,51,0.30)",
+        backdrop: "#FFFFFF",
+        tabBar: "#FFFFFF",
+        placeholder: "#EFEFEF",
+        success: "#1FA97C",
+        danger: "#E5484D",
+        info: "#0A7FB8",
+        card: "#F2F3F4",
+        notification: "#FFFFFF",
     },
 };
 
@@ -40,182 +39,64 @@ export const darkTheme = {
     colors: {
         ..._DarkTheme.colors,
         background: "transparent",
-        text: "#fcfcfc",
-        textSecondary: Color("#fcfcfc").alpha(0.7).toString(),
-        primary: "#3FA3B5",
-        pageBackground: "#202020",
-        shadow: "#999",
-        appBar: "#262626",
-        appBarText: "#fcfcfc",
-        musicBar: "#262626",
-        musicBarText: "#fcfcfc",
-        divider: "rgba(255,255,255,0.1)",
-        listActive: "rgba(255,255,255,0.1)", // 在手机上表现是ripple
-        mask: "rgba(33,33,33,0.8)",
-        backdrop: "#303030",
-        tabBar: "#303030",
-        placeholder: "#424242",
-        success: "#08A34C",
-        danger: "#FC5F5F",
-        info: "#0A95C8",
-        card: "#33333388",
-        notification: "#303030",
+        text: "#FFFFFF",
+        textSecondary: Color("#FFFFFF").alpha(0.55).toString(),
+        primary: "#5DD3A9",
+        pageBackground: "#1F2122",
+        shadow: "#000000",
+        appBar: "#1F2122",
+        appBarText: "#FFFFFF",
+        musicBar: "#232627",
+        musicBarText: "#FFFFFF",
+        divider: "rgba(255,255,255,0.08)",
+        listActive: "rgba(255,255,255,0.07)", // 在手机上表现是ripple
+        mask: "rgba(0,0,0,0.55)",
+        backdrop: "#2A2A2A",
+        tabBar: "#232627",
+        placeholder: "#34383B",
+        success: "#4CC38A",
+        danger: "#F26D6D",
+        info: "#4FA9D8",
+        card: "#2A2A2A",
+        notification: "#232627",
     },
 };
 
-interface IBackgroundInfo {
-    url?: string;
-    blur?: number;
-    opacity?: number;
-}
-
 const themeStore = new GlobalState(darkTheme);
-const backgroundStore = new GlobalState<IBackgroundInfo | null>(null);
 
+/**
+ * 只剩浅色 / 深色两套预设。
+ *
+ * 1.0.0 之前允许「自定义主题」（背景图 + 逐项配色），已整体移除；
+ * 老配置里若还停在 custom，这里直接落到深色，避免控件拿到一套
+ * 对不上号的颜色后界面发虚。
+ */
 function setup() {
-    const currentTheme = Config.getConfig("theme.selectedTheme") ?? "p-dark";
+    const currentTheme = Config.getConfig("theme.selectedTheme");
 
-    if (currentTheme === "p-dark") {
-        themeStore.setValue(darkTheme);
-    } else if (currentTheme === "p-light") {
+    if (currentTheme === "p-light") {
         themeStore.setValue(lightTheme);
-    } else {
-        themeStore.setValue({
-            id: currentTheme,
-            dark: true,
-            // @ts-ignore
-            colors:
-                (Config.getConfig("theme.colors") as CustomizedColors) ??
-                darkTheme.colors,
-        });
+        return;
     }
 
-    const bgUrl = Config.getConfig("theme.background");
-    const bgBlur = Config.getConfig("theme.backgroundBlur");
-    const bgOpacity = Config.getConfig("theme.backgroundOpacity");
-
-    backgroundStore.setValue({
-        url: bgUrl,
-        blur: bgBlur ?? 20,
-        opacity: bgOpacity ?? 0.6,
-    });
-}
-
-function setTheme(
-    themeName: string,
-    extra?: {
-        colors?: Partial<CustomizedColors>;
-        background?: IBackgroundInfo;
-    },
-) {
-    if (themeName === "p-light") {
-        themeStore.setValue(lightTheme);
-    } else if (themeName === "p-dark") {
-        themeStore.setValue(darkTheme);
-    } else {
-        themeStore.setValue({
-            id: themeName,
-            dark: true,
-            colors: {
-                ...darkTheme.colors,
-                ...(extra?.colors ?? {}),
-            },
-        });
-    }
-
-    Config.setConfig("theme.selectedTheme", themeName);
-    Config.setConfig("theme.colors", themeStore.getValue().colors);
-
-    if (extra?.background) {
-        const currentBg = backgroundStore.getValue();
-        let newBg: IBackgroundInfo = {
-            blur: 20,
-            opacity: 0.6,
-            ...(currentBg ?? {}),
-            url: undefined,
-        };
-        if (typeof extra.background.blur === "number") {
-            newBg.blur = extra.background.blur;
-        }
-        if (typeof extra.background.opacity === "number") {
-            newBg.opacity = extra.background.opacity;
-        }
-        if (extra.background.url) {
-            newBg.url = extra.background.url;
-        }
-
-        Config.setConfig("theme.background", newBg.url);
-        Config.setConfig("theme.backgroundBlur", newBg.blur);
-        Config.setConfig("theme.backgroundOpacity", newBg.opacity);
-
-        backgroundStore.setValue(newBg);
+    themeStore.setValue(darkTheme);
+    // 首次启动（没有记录）或老配置停在已移除的 custom 上，都落成深色并写回，
+    // 否则主题设置里两张卡片都不会显示选中态，和实际生效的主题对不上。
+    if (currentTheme !== "p-dark") {
+        Config.setConfig("theme.selectedTheme", "p-dark");
     }
 }
 
-function setColors(colors: Partial<CustomizedColors>) {
-    const currentTheme = themeStore.getValue();
-    if (currentTheme.id !== "p-light" && currentTheme.id !== "p-dark") {
-        const newTheme = {
-            ...currentTheme,
-            colors: {
-                ...currentTheme.colors,
-                ...colors,
-            },
-        };
-        Config.setConfig("theme.customColors", newTheme.colors);
-        Config.setConfig("theme.colors", newTheme.colors);
-        themeStore.setValue(newTheme);
-    }
+function setTheme(themeName: string) {
+    themeStore.setValue(themeName === "p-light" ? lightTheme : darkTheme);
+    Config.setConfig("theme.selectedTheme", themeName === "p-light" ? "p-light" : "p-dark");
 }
-
-function setBackground(backgroundInfo: Partial<IBackgroundInfo>) {
-    const currentBackgroundInfo = backgroundStore.getValue();
-    let newBgInfo = {
-        ...(currentBackgroundInfo ?? {
-            opacity: 0.6,
-            blur: 20,
-        }),
-    };
-    if (typeof backgroundInfo.blur === "number") {
-        Config.setConfig("theme.backgroundBlur", backgroundInfo.blur);
-        newBgInfo.blur = backgroundInfo.blur;
-    }
-    if (typeof backgroundInfo.opacity === "number") {
-        Config.setConfig("theme.backgroundOpacity", backgroundInfo.opacity);
-        newBgInfo.opacity = backgroundInfo.opacity;
-    }
-    if (backgroundInfo.url !== undefined) {
-        Config.setConfig("theme.background", backgroundInfo.url);
-        newBgInfo.url = backgroundInfo.url;
-    }
-    backgroundStore.setValue(newBgInfo);
-}
-
-const configableColorKey: Array<keyof CustomizedColors> = [
-    "primary",
-    "text",
-    "appBar",
-    "appBarText",
-    "musicBar",
-    "musicBarText",
-    "pageBackground",
-    "backdrop",
-    "card",
-    "placeholder",
-    "tabBar",
-    "notification",
-];
-
 
 const Theme = {
     setup,
     setTheme,
-    setBackground,
-    setColors,
     useTheme: themeStore.useValue,
     getTheme: themeStore.getValue,
-    useBackground: backgroundStore.useValue,
-    configableColorKey,
 };
 
 export default Theme;

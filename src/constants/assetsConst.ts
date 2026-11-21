@@ -1,11 +1,8 @@
 export const ImgAsset = {
     albumDefault: require("@/assets/imgs/album-default.jpeg"),
-    addBackground: require("@/assets/imgs/add-image.png"),
     add: require("@/assets/imgs/add.png"),
     logo: require("@/assets/imgs/logo.png"),
-    author: require("@/assets/imgs/author.jpg"),
     logoTransparent: require("@/assets/imgs/logo-transparent.png"),
-    wechatChannel: require("@/assets/imgs/wechat_channel.jpg"),
     // 音质
     quality: {
         low: require("@/assets/imgs/low-quality.png"),

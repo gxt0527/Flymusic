@@ -1,9 +1,15 @@
 import React from "react";
-import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import {
+    StyleProp,
+    StyleSheet,
+    TouchableOpacity,
+    View,
+    ViewStyle,
+} from "react-native";
 import rpx from "@/utils/rpx";
-import { TouchableOpacity } from "react-native-gesture-handler";
 import ThemeText from "@/components/base/themeText";
 import Divider from "@/components/base/divider";
+import Icon from "@/components/base/icon";
 import i18n from "@/core/i18n";
 
 interface IPanelHeaderProps {
@@ -13,6 +19,8 @@ interface IPanelHeaderProps {
     onCancel?: () => void;
     onOk?: () => void;
     hideButtons?: boolean;
+    /** 居中弹窗使用：右上角 X 关闭（Windows 对话框习惯） */
+    onClose?: () => void;
     hideDivider?: boolean;
     style?: StyleProp<ViewStyle>;
 }
@@ -24,6 +32,7 @@ export default function PanelHeader(props: IPanelHeaderProps) {
         onOk,
         onCancel,
         hideButtons,
+        onClose,
         hideDivider,
         style,
     } = props;
@@ -54,6 +63,14 @@ export default function PanelHeader(props: IPanelHeaderProps) {
                         </ThemeText>
                     </TouchableOpacity>
                 )}
+                {onClose ? (
+                    <TouchableOpacity
+                        accessibilityLabel="关闭"
+                        style={styles.closeButton}
+                        onPress={onClose}>
+                        <Icon name="x-mark" size={16} color="#9A9A9A" />
+                    </TouchableOpacity>
+                ) : null}
             </View>
             {hideDivider ? null : <Divider />}
         </>
@@ -75,6 +92,12 @@ const styles = StyleSheet.create({
     },
     rightButton: {
         alignItems: "flex-end",
+    },
+    closeButton: {
+        width: rpx(64),
+        height: "100%",
+        alignItems: "flex-end",
+        justifyContent: "center",
     },
     title: {
         flex: 1,

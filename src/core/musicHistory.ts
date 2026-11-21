@@ -13,6 +13,8 @@ import { safeParse, safeStringify } from "@/utils/jsonUtil";
 
 const musicHistoryAtom = atom<IMusic.IMusicItem[]>([]);
 const musicHistoryStore = getOrCreateMMKV("music.MusicHistory");
+/** 播放历史固定上限：不再暴露给用户设置，统一保留最近 100 条 */
+export const MAX_HISTORY_LENGTH = 100;
 
 class MusicHistory implements IMusicHistory, IInjectable {
     private configService!: IAppConfig;
@@ -39,7 +41,7 @@ class MusicHistory implements IMusicHistory, IInjectable {
             musicItem,
             ...this.history
                 .filter(item => !isSameMediaItem(item, musicItem)),
-        ].slice(0, this.configService.getConfig("basic.maxHistoryLen") ?? 50);
+        ].slice(0, MAX_HISTORY_LENGTH);
         
         musicHistoryStore.set("history", safeStringify(newMusicHistory));
         getDefaultStore().set(musicHistoryAtom, newMusicHistory);

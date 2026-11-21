@@ -9,16 +9,27 @@ type ILinkTextProps = TextProps & {
     fontSize?: keyof typeof fontSizeConst;
     fontWeight?: keyof typeof fontWeightConst;
     linkTo?: string;
+    /** 跟随主题主色，避免浅色主题下浅蓝链接看不清 */
+    linkColor?: string;
     onPress?: (event: GestureResponderEvent) => void;
 };
 
 export default function LinkText(props: ILinkTextProps) {
     const [isPressed, setIsPressed] = useState(false);
+    const { linkColor, ...textProps } = props;
+    const baseColor = linkColor ?? "#66ccff";
 
     return (
         <ThemeText
-            {...props}
-            style={[style.linkText, isPressed ? style.pressed : null]}
+            {...textProps}
+            style={[
+                style.linkText,
+                { color: baseColor },
+                props.style,
+                isPressed
+                    ? { color: Color(baseColor).alpha(0.5).toString() }
+                    : null,
+            ]}
             onPressIn={() => {
                 setIsPressed(true);
             }}
@@ -39,10 +50,6 @@ export default function LinkText(props: ILinkTextProps) {
 
 const style = StyleSheet.create({
     linkText: {
-        color: "#66ccff",
         textDecorationLine: "underline",
-    },
-    pressed: {
-        color: Color("#66ccff").alpha(0.4).toString(),
     },
 });

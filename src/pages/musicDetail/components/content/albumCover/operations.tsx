@@ -9,6 +9,7 @@ import Toast from "@/utils/toast";
 import toast from "@/utils/toast";
 import useOrientation from "@/hooks/useOrientation";
 import { showPanel } from "@/components/panels/usePanel";
+import { getPressAnchor } from "@/components/panels/anchor";
 import TrackPlayer, { useCurrentMusic, useMusicQuality } from "@/core/trackPlayer";
 import { iconSizeConst } from "@/constants/uiConst";
 import PersistStatus from "@/utils/persistStatus";
@@ -40,12 +41,13 @@ export default function Operations() {
             ]}>
             <HeartIcon />
             <Pressable
-                onPress={() => {
+                onPress={e => {
                     if (!musicItem) {
                         return;
                     }
                     showPanel("MusicQuality", {
                         musicItem,
+                        anchor: getPressAnchor(e),
                         async onQualityPress(quality) {
                             const changeResult =
                                 await TrackPlayer.changeQuality(quality);
@@ -64,11 +66,12 @@ export default function Operations() {
                 name={isDownloaded ? "check-circle-outline" : "arrow-down-tray"}
                 size={iconSizeConst.normal}
                 color="white"
-                onPress={() => {
+                onPress={e => {
                     if (musicItem && !isDownloaded) {
                         showPanel("MusicQuality", {
                             type: "download",
                             musicItem,
+                            anchor: getPressAnchor(e),
                             async onQualityPress(quality) {
                                 downloader.download(musicItem, quality);
                             },
@@ -77,11 +80,13 @@ export default function Operations() {
                 }}
             />
             <Pressable
-                onPress={() => {
+                onPress={e => {
                     if (!musicItem) {
                         return;
                     }
                     showPanel("PlayRate", {
+                        anchor: getPressAnchor(e),
+                        currentRate: rate ?? 100,
                         async onRatePress(newRate) {
                             if (rate !== newRate) {
                                 try {
@@ -115,11 +120,12 @@ export default function Operations() {
                 name="ellipsis-vertical"
                 size={iconSizeConst.normal}
                 color="white"
-                onPress={() => {
+                onPress={e => {
                     if (musicItem) {
                         showPanel("MusicItemOptions", {
                             musicItem: musicItem,
                             from: ROUTE_PATH.MUSIC_DETAIL,
+                            anchor: getPressAnchor(e),
                         });
                     }
                 }}

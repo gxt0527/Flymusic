@@ -1,4 +1,7 @@
 import ColorBlock from "@/components/base/colorBlock";
+import InlineSelectRow, {
+    IInlineSelectData,
+} from "@/components/base/inlineSelectRow";
 import ListItem from "@/components/base/listItem";
 import Paragraph from "@/components/base/paragraph";
 import ThemeSwitch from "@/components/base/switch";
@@ -14,6 +17,10 @@ import useColors from "@/hooks/useColors";
 import LyricUtil, { NativeTextAlignment } from "@/native/lyricUtil";
 import { AppConfigPropertyKey } from "@/types/core/config";
 import { clearCache, getCacheSize, sizeFormatter } from "@/utils/fileUtils";
+import {
+    hasNativeDirectoryPicker,
+    pickDirectory,
+} from "@/utils/directoryPicker";
 import { clearLog, getErrorLogContent } from "@/utils/log";
 import { qualityKeys } from "@/utils/qualities";
 import rpx from "@/utils/rpx";
@@ -21,7 +28,7 @@ import Toast from "@/utils/toast";
 import Clipboard from "@react-native-clipboard/clipboard";
 import Slider from "@react-native-community/slider";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Platform, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { readdir } from "react-native-fs";
 import { FlatList, ScrollView } from "react-native-gesture-handler";
 
@@ -53,6 +60,24 @@ const createRadio = function (
     valueMap?: Record<string | number, string | number>,
     onChange?: (value: string | number) => void,
 ) {
+    // 配置项默认值可能不在 valueMap 里（例如排序默认 "end"），
+    // 不能把 String(undefined) 显示成 "undefined"
+    const valueLabel = String(
+        valueMap && valueMap[value] !== undefined ? valueMap[value] : value,
+    );
+    /** 桌面端不再弹整屏对话框，改成就地展开的向下菜单；移动端保留原 RadioDialog */
+    const select: IInlineSelectData = {
+        valueLabel,
+        value,
+        options: candidates.map(_ => ({
+            label: String(valueMap ? valueMap[_] : _),
+            value: _,
+        })),
+        onSelect(val) {
+            Config.setConfig(changeKey, val);
+            onChange?.(val);
+        },
+    };
     const onPress = () => {
         showDialog("RadioDialog", {
             title,
@@ -72,12 +97,25 @@ const createRadio = function (
         title,
         right: (
             <ThemeText style={styles.centerText}>
-                {valueMap ? valueMap[value] : value}
+                {valueLabel}
             </ThemeText>
         ),
         onPress,
+        select,
     };
 };
+
+/**
+ * 音乐缓存上限统一按「整数 MB」展示。
+ * 旧实现直接喂 sizeFormatter，未设置时兜底成 "512M"、设置后变成 "512.0MB"，
+ * 两种写法混在一起看着像是数值算错了；这里统一口径。
+ */
+function formatCacheLimit(bytes?: number) {
+    if (!bytes || bytes <= 0) {
+        return "512 MB";
+    }
+    return `${Math.round(bytes / 1024 / 1024)} MB`;
+}
 
 function useCacheSize() {
     const [cacheSize, setCacheSize] = useState({
@@ -120,14 +158,11 @@ export default function BasicSetting() {
     const playQualityOrder = useAppConfig("basic.playQualityOrder");
     const defaultDownloadQuality = useAppConfig("basic.defaultDownloadQuality");
     const downloadQualityOrder = useAppConfig("basic.downloadQualityOrder");
-    const musicDetailDefault = useAppConfig("basic.musicDetailDefault");
     const musicDetailAwake = useAppConfig("basic.musicDetailAwake");
-    const maxHistoryLen = useAppConfig("basic.maxHistoryLen");
     const autoUpdatePlugin = useAppConfig("basic.autoUpdatePlugin");
-    const notCheckPluginVersion = useAppConfig("basic.notCheckPluginVersion");
     const lazyLoadPlugin = useAppConfig("basic.lazyLoadPlugin");
-    const associateLyricType = useAppConfig("basic.associateLyricType");
     const showExitOnNotification = useAppConfig("basic.showExitOnNotification");
+    const closeAction = useAppConfig("basic.closeAction");
     const musicOrderInLocalSheet = useAppConfig("basic.musicOrderInLocalSheet");
     const tryChangeSourceWhenPlayFail = useAppConfig("basic.tryChangeSourceWhenPlayFail");
 
@@ -138,6 +173,9 @@ export default function BasicSetting() {
     const debugEnableDevLog = useAppConfig("debug.devLog");
 
     const navigate = useNavigate();
+    /** Windows / Electron 端没有系统通知栏、移动网络、状态栏歌词等原生能力，
+     *  这些配置项在这里全是无效的空实现，直接从设置页移除。 */
+    const isDesktop = Platform.OS === "web";
 
     const [cacheSize, refreshCacheSize] = useCacheSize();
 
@@ -152,42 +190,36 @@ export default function BasicSetting() {
         {
             title: t("basicSettings.common"),
             data: [
-                createRadio(
-                    t("basicSettings.maxHistoryLength"),
-                    "basic.maxHistoryLen",
-                    [20, 50, 100, 200, 500],
-                    maxHistoryLen ?? 50,
-                ),
-                createRadio(
-                    t("basicSettings.musicDetailDefault"),
-                    "basic.musicDetailDefault",
-                    ["album", "lyric"],
-                    musicDetailDefault ?? "album",
-                    {
-                        album: t("basicSettings.musicDetailDefault.album"),
-                        lyric: t("basicSettings.musicDetailDefault.lyric"),
-                    },
-                ),
-                createSwitch(
-                    t("basicSettings.musicDetailAwake"),
-                    "basic.musicDetailAwake",
-                    musicDetailAwake ?? false,
-                ),
-                createRadio(
-                    t("basicSettings.associateLyricType"),
-                    "basic.associateLyricType",
-                    ["input", "search"],
-                    associateLyricType ?? "search",
-                    {
-                        input: t("basicSettings.associateLyricType.input"),
-                        search: t("basicSettings.associateLyricType.search"),
-                    },
-                ),
-                createSwitch(
-                    t("basicSettings.showExitOnNotification"),
-                    "basic.showExitOnNotification",
-                    showExitOnNotification ?? false,
-                ),
+                // 桌面端：关闭按钮行为放常规设置最上方（不再单独开一节，也没有说明副标题）
+                ...(isDesktop
+                    ? [
+                        createRadio(
+                            t("basicSettings.closeAction"),
+                            "basic.closeAction",
+                            ["tray", "quit"],
+                            closeAction ?? "tray",
+                            {
+                                tray: t("basicSettings.closeAction.tray"),
+                                quit: t("basicSettings.closeAction.quit"),
+                            },
+                        ),
+                    ]
+                    : []),
+                // 历史记录条数固定 100 条，不再交给用户自定义
+                ...(isDesktop
+                    ? []
+                    : [
+                        createSwitch(
+                            t("basicSettings.musicDetailAwake"),
+                            "basic.musicDetailAwake",
+                            musicDetailAwake ?? false,
+                        ),
+                        createSwitch(
+                            t("basicSettings.showExitOnNotification"),
+                            "basic.showExitOnNotification",
+                            showExitOnNotification ?? false,
+                        ),
+                    ]),
             ],
         },
         {
@@ -214,19 +246,10 @@ export default function BasicSetting() {
                     },
                 ),
                 createRadio(
-                    t("basicSettings.musicDetailDefault"),
-                    "basic.musicDetailDefault",
-                    ["album", "lyric"],
-                    musicDetailDefault ?? "album",
-                    {
-                        album: t("basicSettings.musicDetailDefault.album"),
-                        lyric: t("basicSettings.musicDetailDefault.lyric"),
-                    },
-                ),
-                createRadio(
                     t("basicSettings.musicOrderInLocalSheet"),
                     "basic.musicOrderInLocalSheet",
                     [
+                        "end",
                         SortType.Title,
                         SortType.Artist,
                         SortType.Album,
@@ -235,6 +258,7 @@ export default function BasicSetting() {
                     ],
                     musicOrderInLocalSheet ?? "end",
                     {
+                        end: t("common.default"),
                         [SortType.Title]: t("basicSettings.musicOrderInLocalSheet.title"),
                         [SortType.Artist]: t("basicSettings.musicOrderInLocalSheet.artist"),
                         [SortType.Album]: t("basicSettings.musicOrderInLocalSheet.album"),
@@ -253,11 +277,6 @@ export default function BasicSetting() {
                     autoUpdatePlugin ?? false,
                 ),
                 createSwitch(
-                    t("basicSettings.notCheckPluginVersion"),
-                    "basic.notCheckPluginVersion",
-                    notCheckPluginVersion ?? false,
-                ),
-                createSwitch(
                     t("basicSettings.lazyLoadPlugin"),
                     "basic.lazyLoadPlugin",
                     lazyLoadPlugin ?? false,
@@ -267,11 +286,15 @@ export default function BasicSetting() {
         {
             title: t("basicSettings.playback"),
             data: [
-                createSwitch(
-                    t("basicSettings.notInterrupt"),
-                    "basic.notInterrupt",
-                    notInterrupt ?? false,
-                ),
+                ...(isDesktop
+                    ? []
+                    : [
+                        createSwitch(
+                            t("basicSettings.notInterrupt"),
+                            "basic.notInterrupt",
+                            notInterrupt ?? false,
+                        ),
+                    ]),
                 createSwitch(
                     t("basicSettings.autoPlayWhenAppStart"),
                     "basic.autoPlayWhenAppStart",
@@ -287,29 +310,35 @@ export default function BasicSetting() {
                     "basic.autoStopWhenError",
                     autoStopWhenError ?? false,
                 ),
-                createRadio(
-                    t("basicSettings.tempRemoteDuck"),
-                    "basic.tempRemoteDuck",
-                    ["pause", "lowerVolume"],
-                    tempRemoteDuck ?? "pause",
-                    {
-                        pause: t("basicSettings.tempRemoteDuck.pause"),
-                        "lowerVolume": t("basicSettings.tempRemoteDuck.lowerVolume"),
-                    }
-                ),
-                ...(tempRemoteDuck === "lowerVolume" ? [
-                    createRadio(
-                        t("basicSettings.tempRemoteDuck.volumeDecreaseLevel"),
-                        "basic.tempRemoteDuckVolume",
-                        [0.3, 0.5, 0.8],
-                        tempRemoteDuckVolume ?? 0.5,
-                        {
-                            0.3: "30%",
-                            0.5: "50%",
-                            0.8: "80%",
-                        }
-                    ),
-                ] : []),
+                ...(isDesktop
+                    ? []
+                    : [
+                        createRadio(
+                            t("basicSettings.tempRemoteDuck"),
+                            "basic.tempRemoteDuck",
+                            ["pause", "lowerVolume"],
+                            tempRemoteDuck ?? "pause",
+                            {
+                                pause: t("basicSettings.tempRemoteDuck.pause"),
+                                "lowerVolume": t("basicSettings.tempRemoteDuck.lowerVolume"),
+                            }
+                        ),
+                        ...(tempRemoteDuck === "lowerVolume"
+                            ? [
+                                createRadio(
+                                    t("basicSettings.tempRemoteDuck.volumeDecreaseLevel"),
+                                    "basic.tempRemoteDuckVolume",
+                                    [0.3, 0.5, 0.8],
+                                    tempRemoteDuckVolume ?? 0.5,
+                                    {
+                                        0.3: "30%",
+                                        0.5: "50%",
+                                        0.8: "80%",
+                                    }
+                                ),
+                            ]
+                            : []),
+                    ]),
                 createRadio(
                     t("basicSettings.defaultPlayQuality"),
                     "basic.defaultPlayQuality",
@@ -348,7 +377,37 @@ export default function BasicSetting() {
                                 pathConst.downloadMusicPath}
                         </ThemeText>
                     ),
-                    onPress() {
+                    async onPress() {
+                        // 桌面端直接弹 Windows 原生「选择文件夹」，不再进应用内的
+                        // 移动端文件浏览器（那套界面在宽屏上完全不对路）
+                        if (hasNativeDirectoryPicker) {
+                            const picked = await pickDirectory({
+                                title: t("basicSettings.downloadPath"),
+                                buttonLabel: t(
+                                    "basicSettings.fileSelector.selectFolder",
+                                ),
+                                defaultPath:
+                                    downloadPath ?? pathConst.downloadMusicPath,
+                            });
+                            if (picked === null) {
+                                // 环境不支持，落到应用内选择页
+                            } else if (picked.length === 0) {
+                                return;
+                            } else {
+                                try {
+                                    await readdir(picked[0]);
+                                    Config.setConfig(
+                                        "basic.downloadPath",
+                                        picked[0],
+                                    );
+                                } catch {
+                                    Toast.warn(
+                                        t("toast.folderNotExistOrNoPermission"),
+                                    );
+                                }
+                                return;
+                            }
+                        }
                         navigate<"file-selector">(ROUTE_PATH.FILE_SELECTOR, {
                             fileType: "folder",
                             multi: false,
@@ -400,21 +459,25 @@ export default function BasicSetting() {
                 ),
             ],
         },
-        {
-            title: t("basicSettings.network"),
-            data: [
-                createSwitch(
-                    t("basicSettings.useCelluarNetworkPlay"),
-                    "basic.useCelluarNetworkPlay",
-                    useCelluarNetworkPlay ?? false,
-                ),
-                createSwitch(
-                    t("basicSettings.useCelluarNetworkDownload"),
-                    "basic.useCelluarNetworkDownload",
-                    useCelluarNetworkDownload ?? false,
-                ),
-            ],
-        },
+        ...(isDesktop
+            ? []
+            : [
+                {
+                    title: t("basicSettings.network"),
+                    data: [
+                        createSwitch(
+                            t("basicSettings.useCelluarNetworkPlay"),
+                            "basic.useCelluarNetworkPlay",
+                            useCelluarNetworkPlay ?? false,
+                        ),
+                        createSwitch(
+                            t("basicSettings.useCelluarNetworkDownload"),
+                            "basic.useCelluarNetworkDownload",
+                            useCelluarNetworkDownload ?? false,
+                        ),
+                    ],
+                },
+            ]),
         {
             title: t("basicSettings.lyric"),
             data: [],
@@ -427,9 +490,7 @@ export default function BasicSetting() {
                     title: t("basicSettings.cache.musicCacheLimit"),
                     right: (
                         <ThemeText style={styles.centerText}>
-                            {maxCacheSize
-                                ? sizeFormatter(maxCacheSize)
-                                : "512M"}
+                            {formatCacheLimit(maxCacheSize)}
                         </ThemeText>
                     ),
                     onPress() {
@@ -515,60 +576,64 @@ export default function BasicSetting() {
                 },
             ],
         },
-        {
-            title: t("basicSettings.developer"),
-            data: [
-                createSwitch(
-                    t("basicSettings.developer.errorLog"),
-                    "debug.errorLog",
-                    debugEnableErrorLog ?? false,
-                ),
-                createSwitch(
-                    t("basicSettings.developer.traceLog"),
-                    "debug.traceLog",
-                    debugEnableTraceLog ?? false,
-                ),
-                createSwitch(
-                    t("basicSettings.developer.devLog"),
-                    "debug.devLog",
-                    debugEnableDevLog ?? false,
-                ),
+        ...(isDesktop
+            ? []
+            : [
                 {
-                    title: t("basicSettings.developer.viewErrorLog"),
-                    right: undefined,
-                    async onPress() {
-                        // 获取日志文件夹
-                        const errorLogContent = await getErrorLogContent();
-                        showDialog("SimpleDialog", {
-                            title: t("dialog.errorLogTitle"),
-                            content: (
-                                <ScrollView>
-                                    <Paragraph>
-                                        {errorLogContent || t("dialog.errorLogNoRecord")}
-                                    </Paragraph>
-                                </ScrollView>
-                            ),
-                            cancelText: t("dialog.errorLogKnow"),
-                            okText: t("dialog.errorLogCopy"),
-                            onOk() {
-                                Clipboard.setString(errorLogContent);
-                                Toast.success(t("toast.copiedToClipboard"));
+                    title: t("basicSettings.developer"),
+                    data: [
+                        createSwitch(
+                            t("basicSettings.developer.errorLog"),
+                            "debug.errorLog",
+                            debugEnableErrorLog ?? false,
+                        ),
+                        createSwitch(
+                            t("basicSettings.developer.traceLog"),
+                            "debug.traceLog",
+                            debugEnableTraceLog ?? false,
+                        ),
+                        createSwitch(
+                            t("basicSettings.developer.devLog"),
+                            "debug.devLog",
+                            debugEnableDevLog ?? false,
+                        ),
+                        {
+                            title: t("basicSettings.developer.viewErrorLog"),
+                            right: undefined,
+                            async onPress() {
+                                // 获取日志文件夹
+                                const errorLogContent = await getErrorLogContent();
+                                showDialog("SimpleDialog", {
+                                    title: t("dialog.errorLogTitle"),
+                                    content: (
+                                        <ScrollView>
+                                            <Paragraph>
+                                                {errorLogContent || t("dialog.errorLogNoRecord")}
+                                            </Paragraph>
+                                        </ScrollView>
+                                    ),
+                                    cancelText: t("dialog.errorLogKnow"),
+                                    okText: t("dialog.errorLogCopy"),
+                                    onOk() {
+                                        Clipboard.setString(errorLogContent);
+                                        Toast.success(t("toast.copiedToClipboard"));
+                                    },
+                                });
                             },
-                        });
-                    },
+                        },
+                        {
+                            title: t("basicSettings.developer.clearLog"),
+                            right: undefined,
+                            async onPress() {
+                                try {
+                                    await clearLog();
+                                    Toast.success(t("toast.logCleared"));
+                                } catch { }
+                            },
+                        },
+                    ],
                 },
-                {
-                    title: t("basicSettings.developer.clearLog"),
-                    right: undefined,
-                    async onPress() {
-                        try {
-                            await clearLog();
-                            Toast.success(t("toast.logCleared"));
-                        } catch { }
-                    },
-                },
-            ],
-        },
+            ]),
     ];
 
     return (
@@ -609,8 +674,19 @@ export default function BasicSetting() {
                 renderSectionFooter={({ section }) => {
                     return section.footer ?? null;
                 }}
-                renderItem={({ item }) => {
+                renderItem={({ item, index }) => {
                     const Right = item.right;
+
+                    // Windows 端：可选项由「弹窗」改成选项行下方的就地菜单
+                    if (isDesktop && (item as any).select) {
+                        return (
+                            <InlineSelectRow
+                                testID={`inline-select-row-${index}`}
+                                title={item.title}
+                                {...(item as any).select}
+                            />
+                        );
+                    }
 
                     return (
                         <ListItem
@@ -687,13 +763,15 @@ function LyricSetting() {
 
 
     const colors = useColors();
+    /** Windows 端没有系统状态栏歌词，开关/取色全是空实现，只保留能作用到播放页的设置 */
+    const isDesktop = Platform.OS === "web";
 
     const { t } = useI18N();
 
     const autoSearchLyric = createSwitch(
         t("basicSettings.lyric.autoSearchLyric"),
         "lyric.autoSearchLyric",
-        enableAutoSearchLyric ?? false,
+        enableAutoSearchLyric ?? true,
     );
 
     const openStatusBarLyric = createSwitch(
@@ -717,7 +795,7 @@ function LyricSetting() {
                             fontSize: Config.getConfig("lyric.fontSize"),
                         };
                         LyricUtil.showStatusBarLyric(
-                            "MusicFree",
+                            "Fly音乐",
                             statusBarLyricConfig ?? {}
                         );
                         Config.setConfig("lyric.showStatusBarLyric", true);
@@ -755,6 +833,12 @@ function LyricSetting() {
         },
     );
 
+    /**
+     * Windows 端没有系统状态栏歌词，LyricUtil 是空实现。
+     * 下面四个滑块改为直接作用于「播放页歌词」：左右/上下距离 → 歌词区内边距，
+     * 歌词宽度 → 歌词列表最大宽度，字体大小 → 歌词字号。
+     * 默认值按「不改变原有播放页外观」选取，只有用户拖动后才会变化。
+     */
     return (
         <View>
             <ListItem
@@ -764,55 +848,67 @@ function LyricSetting() {
                 <ListItem.Content title={autoSearchLyric.title} />
                 {autoSearchLyric.right}
             </ListItem>
-            <ListItem
-                withHorizontalPadding
-                heightType="small"
-                onPress={openStatusBarLyric.onPress}>
-                <ListItem.Content title={openStatusBarLyric.title} />
-                {openStatusBarLyric.right}
-            </ListItem>
-            <View style={lyricStyles.sliderContainer}>
-                <ThemeText>{t("basicSettings.lyric.leftRightDistance")}</ThemeText>
-                <Slider
-                    style={lyricStyles.slider}
-                    minimumTrackTintColor={colors.primary}
-                    maximumTrackTintColor={colors.text ?? "#999999"}
-                    thumbTintColor={colors.primary}
-                    minimumValue={0}
-                    step={0.01}
-                    value={leftPercent ?? 0.5}
-                    maximumValue={1}
-                    onValueChange={val => {
-                        if (showStatusBarLyric) {
-                            LyricUtil.setStatusBarLyricLeft(val);
-                        }
-                    }}
-                    onSlidingComplete={val => {
-                        Config.setConfig("lyric.leftPercent", val);
-                    }}
-                />
-            </View>
-            <View style={lyricStyles.sliderContainer}>
-                <ThemeText>{t("basicSettings.lyric.topBottomDistance")}</ThemeText>
-                <Slider
-                    style={lyricStyles.slider}
-                    minimumTrackTintColor={colors.primary}
-                    maximumTrackTintColor={colors.text ?? "#999999"}
-                    thumbTintColor={colors.primary}
-                    minimumValue={0}
-                    value={topPercent ?? 0}
-                    step={0.01}
-                    maximumValue={1}
-                    onValueChange={val => {
-                        if (showStatusBarLyric) {
-                            LyricUtil.setStatusBarLyricTop(val);
-                        }
-                    }}
-                    onSlidingComplete={val => {
-                        Config.setConfig("lyric.topPercent", val);
-                    }}
-                />
-            </View>
+            {isDesktop ? null : (
+                <ListItem
+                    withHorizontalPadding
+                    heightType="small"
+                    onPress={openStatusBarLyric.onPress}>
+                    <ListItem.Content title={openStatusBarLyric.title} />
+                    {openStatusBarLyric.right}
+                </ListItem>
+            )}
+            {/* 左右距离 / 上下距离只在移动端状态栏歌词下生效，桌面端调了没反应，
+                直接不渲染，避免出现「拖了没变化」的假设置 */}
+            {isDesktop ? null : (
+                <>
+                    <View style={lyricStyles.sliderContainer}>
+                        <ThemeText>
+                            {t("basicSettings.lyric.leftRightDistance")}
+                        </ThemeText>
+                        <Slider
+                            style={lyricStyles.slider}
+                            minimumTrackTintColor={colors.primary}
+                            maximumTrackTintColor={colors.text ?? "#999999"}
+                            thumbTintColor={colors.primary}
+                            minimumValue={0}
+                            step={0.01}
+                            value={leftPercent ?? 0.5}
+                            maximumValue={1}
+                            onValueChange={val => {
+                                if (showStatusBarLyric) {
+                                    LyricUtil.setStatusBarLyricLeft(val);
+                                }
+                            }}
+                            onSlidingComplete={val => {
+                                Config.setConfig("lyric.leftPercent", val);
+                            }}
+                        />
+                    </View>
+                    <View style={lyricStyles.sliderContainer}>
+                        <ThemeText>
+                            {t("basicSettings.lyric.topBottomDistance")}
+                        </ThemeText>
+                        <Slider
+                            style={lyricStyles.slider}
+                            minimumTrackTintColor={colors.primary}
+                            maximumTrackTintColor={colors.text ?? "#999999"}
+                            thumbTintColor={colors.primary}
+                            minimumValue={0}
+                            value={topPercent ?? 0}
+                            step={0.01}
+                            maximumValue={1}
+                            onValueChange={val => {
+                                if (showStatusBarLyric) {
+                                    LyricUtil.setStatusBarLyricTop(val);
+                                }
+                            }}
+                            onSlidingComplete={val => {
+                                Config.setConfig("lyric.topPercent", val);
+                            }}
+                        />
+                    </View>
+                </>
+            )}
             <View style={lyricStyles.sliderContainer}>
                 <ThemeText>{t("basicSettings.lyric.width")}</ThemeText>
                 <Slider
@@ -822,7 +918,7 @@ function LyricSetting() {
                     thumbTintColor={colors.primary}
                     minimumValue={0}
                     step={0.01}
-                    value={widthPercent ?? 0.5}
+                    value={widthPercent ?? (isDesktop ? 1 : 0.5)}
                     maximumValue={1}
                     onValueChange={val => {
                         if (showStatusBarLyric) {
@@ -844,7 +940,7 @@ function LyricSetting() {
                     minimumValue={Math.round(rpx(18))}
                     step={0.5}
                     maximumValue={Math.round(rpx(56))}
-                    value={fontSize ?? Math.round(rpx(24))}
+                    value={fontSize ?? Math.round(rpx(isDesktop ? 30 : 24))}
                     onValueChange={val => {
                         if (showStatusBarLyric) {
                             LyricUtil.setStatusBarLyricFontSize(val);
@@ -855,57 +951,69 @@ function LyricSetting() {
                     }}
                 />
             </View>
-            <ListItem
-                withHorizontalPadding
-                heightType="small"
-                onPress={alignStatusBarLyric.onPress}>
-                <ListItem.Content title={alignStatusBarLyric.title} />
-                {alignStatusBarLyric.right}
-            </ListItem>
-            <ListItem
-                withHorizontalPadding
-                heightType="small"
-                onPress={() => {
-                    showPanel("ColorPicker", {
-                        closePanelWhenSelected: true,
-                        defaultColor: color ?? "transparent",
-                        onSelected(color) {
-                            if (showStatusBarLyric) {
-                                const colorStr = color.hexa();
-                                LyricUtil.setStatusBarColors(colorStr, null);
-                                Config.setConfig("lyric.color", colorStr);
-                            }
-                        },
-                    });
-                }}>
-                <ListItem.Content title={t("basicSettings.lyric.textColor")} />
-                <ColorBlock color={color ?? "#FFE9D2FF"} />
-            </ListItem>
-            <ListItem
-                withHorizontalPadding
-                heightType="small"
-                onPress={() => {
-                    showPanel("ColorPicker", {
-                        closePanelWhenSelected: true,
-                        defaultColor:
-                            backgroundColor ?? "transparent",
-                        onSelected(color) {
-                            if (showStatusBarLyric) {
-                                const colorStr = color.hexa();
-                                LyricUtil.setStatusBarColors(null, colorStr);
-                                Config.setConfig(
-                                    "lyric.backgroundColor",
-                                    colorStr,
-                                );
-                            }
-                        },
-                    });
-                }}>
-                <ListItem.Content title={t("basicSettings.lyric.backgroundColor")} />
-                <ColorBlock
-                    color={backgroundColor ?? "#84888153"}
+            {isDesktop ? (
+                <InlineSelectRow
+                    testID="inline-select-row-lyric-align"
+                    title={alignStatusBarLyric.title}
+                    {...(alignStatusBarLyric as any).select}
                 />
-            </ListItem>
+            ) : (
+                <ListItem
+                    withHorizontalPadding
+                    heightType="small"
+                    onPress={alignStatusBarLyric.onPress}>
+                    <ListItem.Content title={alignStatusBarLyric.title} />
+                    {alignStatusBarLyric.right}
+                </ListItem>
+            )}
+            {isDesktop ? null : (
+                <>
+                    <ListItem
+                        withHorizontalPadding
+                        heightType="small"
+                        onPress={() => {
+                            showPanel("ColorPicker", {
+                                closePanelWhenSelected: true,
+                                defaultColor: color ?? "transparent",
+                                onSelected(color) {
+                                    if (showStatusBarLyric) {
+                                        const colorStr = color.hexa();
+                                        LyricUtil.setStatusBarColors(colorStr, null);
+                                        Config.setConfig("lyric.color", colorStr);
+                                    }
+                                },
+                            });
+                        }}>
+                        <ListItem.Content title={t("basicSettings.lyric.textColor")} />
+                        <ColorBlock color={color ?? "#FFE9D2FF"} />
+                    </ListItem>
+                    <ListItem
+                        withHorizontalPadding
+                        heightType="small"
+                        onPress={() => {
+                            showPanel("ColorPicker", {
+                                closePanelWhenSelected: true,
+                                defaultColor:
+                                    backgroundColor ?? "transparent",
+                                onSelected(color) {
+                                    if (showStatusBarLyric) {
+                                        const colorStr = color.hexa();
+                                        LyricUtil.setStatusBarColors(null, colorStr);
+                                        Config.setConfig(
+                                            "lyric.backgroundColor",
+                                            colorStr,
+                                        );
+                                    }
+                                },
+                            });
+                        }}>
+                        <ListItem.Content title={t("basicSettings.lyric.backgroundColor")} />
+                        <ColorBlock
+                            color={backgroundColor ?? "#84888153"}
+                        />
+                    </ListItem>
+                </>
+            )}
         </View>
     );
 }

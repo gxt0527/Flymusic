@@ -1,7 +1,14 @@
+/**
+ * 首页顶栏（仅移动端 / 窄屏）
+ *
+ * 桌面端的搜索胶囊已经上提到 DesktopShell 的 DesktopTopBar，
+ * 全站常驻，所以这里在桌面布局下直接返回 null。
+ * 移动端保持原样：品牌标 + 全宽搜索框。
+ */
 import { ROUTE_PATH } from "@/core/router";
 import { useNavigation } from "@react-navigation/native";
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import rpx from "@/utils/rpx";
 import useColors from "@/hooks/useColors";
 import ThemeText from "@/components/base/themeText";
@@ -9,24 +16,36 @@ import Color from "color";
 import IconButton from "@/components/base/iconButton";
 import Icon from "@/components/base/icon.tsx";
 import { useI18N } from "@/core/i18n";
+import { useLayoutMode } from "@/components/layout";
 
-// todo icon: = musicFree(引入自定义字体 居中) search
-export default function NavBar() {
+interface INavBarProps {
+    /** 窄屏（无侧栏）时在左侧显示品牌标，宽屏由侧栏承担 */
+    showBrand?: boolean;
+}
+
+export default function NavBar(props: INavBarProps) {
     const navigation = useNavigation<any>();
     const colors = useColors();
     const { t } = useI18N();
+    const layoutMode = useLayoutMode();
+    const isDesktop = Platform.OS === "web" && layoutMode !== "tab";
+
+    // 桌面端的搜索栏已经上提到 DesktopShell（全局常驻，切页面不消失），
+    // 这里再画一条就会重复，直接让位。
+    if (isDesktop) {
+        return null;
+    }
 
     return (
         <View style={styles.appbar}>
-            <IconButton
-                accessibilityLabel={t("home.openSidebar.a11y")}
-                name="bars-3"
-                style={styles.menu}
-                color={colors.text}
-                onPress={() => {
-                    navigation?.openDrawer();
-                }}
-            />
+            {props.showBrand ? (
+                <Icon
+                    name="musical-note"
+                    size={rpx(40)}
+                    color={colors.primary}
+                    style={styles.brand}
+                />
+            ) : null}
 
             <Pressable
                 style={[
@@ -53,6 +72,16 @@ export default function NavBar() {
                     {t("home.clickToSearch")}
                 </ThemeText>
             </Pressable>
+
+            <IconButton
+                accessibilityLabel={t("common.setting")}
+                name="cog-8-tooth"
+                style={styles.setting}
+                color={colors.textSecondary}
+                onPress={() => {
+                    navigation.navigate(ROUTE_PATH.SETTING, { type: "basic" });
+                }}
+            />
         </View>
     );
 }
@@ -80,7 +109,11 @@ const styles = StyleSheet.create({
         marginLeft: rpx(12),
         opacity: 0.6,
     },
-    menu: {
+    brand: {
         marginLeft: rpx(24),
+        marginRight: rpx(4),
+    },
+    setting: {
+        marginRight: rpx(16),
     },
 });

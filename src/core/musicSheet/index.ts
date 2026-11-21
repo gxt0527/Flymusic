@@ -329,16 +329,19 @@ class MusicSheetClazz implements IInjectable {
         if (!addedCount) {
             return;
         }
-        const musicSheets = getDefaultStore().get(musicSheetsBaseAtom);
-        if (
-            !musicSheets
-                .find(_ => _.id === sheetId)
-                ?.coverImg?.startsWith?.("file://")
-        ) {
-            await this.updateMusicSheetBase(sheetId, {
-                coverImg: musicList.at(0)?.artwork,
-            });
-        }
+        /**
+         * 先通知 UI，再落库。
+         *
+         * storage 的写入走 InteractionManager.runAfterInteractions，
+         * 真正落盘可能被推迟到交互结束；收藏红心是收到这条事件才点亮的，
+         * 事件放在落库之后，就会「点一下要等一会儿才亮」。
+         * 内存里的 musicList 此时已经变了，先发事件没有任何副作用。
+         */
+        ee.emit("UpdateMusicList", {
+            sheetId,
+            updateType: "length",
+        });
+
         // 更新音乐数量
         getDefaultStore().set(
             musicSheetsBaseAtom,
@@ -349,6 +352,65 @@ class MusicSheetClazz implements IInjectable {
                 }
             }),
         );
+        const musicSheets = getDefaultStore().get(musicSheetsBaseAtom);
+        if (
+            !musicSheets
+                .find(_ => _.id === sheetId)
+                ?.coverImg?.startsWith?.("file://")
+        ) {
+            this.updateMusicSheetBase(sheetId, {
+                coverImg: musicList.at(0)?.artwork,
+            }).catch(() => {});
+        }
+        storage.setMusicList(sheetId, musicList.musicList).catch(() => {});
+    }
+
+
+    /**
+     * 更新导入歌单的占位曲目。
+     *
+     * @param replace true 表示 payload 是一首真实歌曲，用它整体替换占位项
+     *                （保留歌单内的 $timestamp / $sortIndex，去掉导入标记字段）；
+     *                false 表示只打补丁（例如把 $importStatus 改成 matching / failed）。
+     */
+    async updateImportItem(
+        sheetId: string,
+        importKey: string,
+        payload: Partial<IMusic.IMusicItem>,
+        replace = false,
+    ) {
+        const musicList = this.getSortedMusicListBySheetId(sheetId);
+        const changed = musicList.replaceOne(
+            it => it.$importKey === importKey,
+            oldItem => {
+                if (!replace) {
+                    return { ...oldItem, ...payload };
+                }
+                const cleanItem: Record<string, any> = { ...payload };
+                delete cleanItem.$importKey;
+                delete cleanItem.$importStatus;
+                delete cleanItem.$importQuery;
+                return {
+                    ...cleanItem,
+                    $timestamp: oldItem.$timestamp,
+                    $sortIndex: oldItem.$sortIndex,
+                } as unknown as IMusic.IMusicItem;
+            },
+        );
+        if (!changed) {
+            return;
+        }
+
+        const musicSheets = getDefaultStore().get(musicSheetsBaseAtom);
+        if (
+            !musicSheets
+                .find(_ => _.id === sheetId)
+                ?.coverImg?.startsWith?.("file://")
+        ) {
+            await this.updateMusicSheetBase(sheetId, {
+                coverImg: musicList.at(0)?.artwork,
+            });
+        }
         await storage.setMusicList(sheetId, musicList.musicList);
         ee.emit("UpdateMusicList", {
             sheetId,
@@ -356,6 +418,30 @@ class MusicSheetClazz implements IInjectable {
         });
     }
 
+    /**
+     * 没有任何可用歌源时，把该歌单里的占位曲目一次性标成「未找到」。
+     * 以前是每首调一次 updateImportItem，几百首要写几百次全量歌单，
+     * 会让「保存并匹配」卡住十几秒；这里只落库一次。
+     */
+    async markAllImportItemsFailed(sheetId: string) {
+        const musicList = this.getSortedMusicListBySheetId(sheetId);
+        const changed = musicList.replaceAll(
+            it => !!it.$importKey && it.$importStatus !== "failed",
+            it =>
+                ({
+                    ...it,
+                    $importStatus: "failed",
+                }) as unknown as IMusic.IMusicItem,
+        );
+        if (!changed) {
+            return;
+        }
+        await storage.setMusicList(sheetId, musicList.musicList);
+        ee.emit("UpdateMusicList", {
+            sheetId,
+            updateType: "length",
+        });
+    }
 
     async removeMusicByIndex(sheetId: string, indices: number | number[]) {
         if (!Array.isArray(indices)) {
@@ -406,10 +492,25 @@ class MusicSheetClazz implements IInjectable {
         const musicList = this.getSortedMusicListBySheetId(sheetId);
         musicList.remove(musicItems);
 
-        // Update
-        const musicSheets = getDefaultStore().get(musicSheetsBaseAtom);
+        // 同 addMusic：先发事件让 UI 立刻响应，落库放到后面
+        ee.emit("UpdateMusicList", {
+            sheetId,
+            updateType: "length",
+        });
 
-        let patchData: Partial<IMusic.IMusicSheetItemBase> = {};
+        getDefaultStore().set(
+            musicSheetsBaseAtom,
+            produce(draft => {
+                const musicSheet = draft.find(it => it.id === sheetId);
+                if (musicSheet) {
+                    musicSheet.worksNum = musicList.length;
+                }
+            }),
+        );
+        const musicSheets = getDefaultStore().get(musicSheetsBaseAtom);
+        const patchData: Partial<IMusic.IMusicSheetItemBase> = {
+            worksNum: musicList.length,
+        };
         if (
             !musicSheets
                 .find(_ => _.id === sheetId)
@@ -417,16 +518,8 @@ class MusicSheetClazz implements IInjectable {
         ) {
             patchData.coverImg = musicList.at(0)?.artwork;
         }
-        patchData.worksNum = musicList.length;
-        await this.updateMusicSheetBase(sheetId, {
-            coverImg: musicList.at(0)?.artwork,
-        });
-
-        await storage.setMusicList(sheetId, musicList.musicList);
-        ee.emit("UpdateMusicList", {
-            sheetId,
-            updateType: "length",
-        });
+        this.updateMusicSheetBase(sheetId, patchData).catch(() => {});
+        storage.setMusicList(sheetId, musicList.musicList).catch(() => {});
     }
 
 
@@ -515,6 +608,22 @@ function useSheetItem(sheetId: string) {
         musicList: musicListMap.get(sheetId)?.musicList || [],
     });
 
+    /**
+     * 同一个路由（local-sheet-detail）在「我的收藏 / 自建歌单 / 导入歌单」
+     * 之间切换时组件不会卸载，只换 params。以前 state 只在首次挂载初始化、
+     * 事件监听的 effect 依赖还是 []，导致切回来仍显示上一个歌单的歌曲，
+     * 表现为「导入的歌单在我的收藏里看不到」。
+     */
+    useEffect(() => {
+        setSheetItem({
+            ...(getDefaultStore()
+                .get(musicSheetsBaseAtom)
+                .find(it => it.id === sheetId) ||
+                ({} as IMusic.IMusicSheetItemBase)),
+            musicList: musicListMap.get(sheetId)?.musicList || [],
+        });
+    }, [sheetId]);
+
     useEffect(() => {
         const onUpdateMusicList = ({ sheetId: updatedSheetId }) => {
             if (updatedSheetId !== sheetId) {
@@ -544,7 +653,7 @@ function useSheetItem(sheetId: string) {
             ee.off("UpdateMusicList", onUpdateMusicList);
             ee.off("UpdateSheetBasic", onUpdateSheetBasic);
         };
-    }, []);
+    }, [sheetId]);
 
     return sheetItem;
 }

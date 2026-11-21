@@ -19,6 +19,8 @@ import ImageViewer from "./imageViewer";
 import MusicComment from "./musicComment";
 import MusicItemLyricOptions from "./musicItemLyricOptions";
 import EditMusicSheetInfo from "./editMusicSheetInfo";
+import ImportPlaylist from "./importPlaylist";
+import ImportPlaylistMatch from "./importPlaylistMatch";
 
 export default {
     /** 加入歌单 */
@@ -27,8 +29,12 @@ export default {
     MusicItemOptions,
     /** 新建歌单 */
     CreateMusicSheet,
-    /** 导入歌单 */
+    /** 导入歌单（原：按插件导入） */
     ImportMusicSheet,
+    /** 智能导入歌单：QQ音乐 / 网易云 / 酷狗链接解析 */
+    ImportPlaylist,
+    /** 导入歌单：歌源匹配进度 */
+    ImportPlaylistMatch,
     /** 当前播放列表 */
     PlayList: PlayList,
     /** 关联歌词 */

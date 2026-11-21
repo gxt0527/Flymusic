@@ -2,9 +2,10 @@ import StatusBar from "@/components/base/statusBar";
 import globalStyle from "@/constants/globalStyle";
 import useOrientation from "@/hooks/useOrientation";
 import React, { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Background from "./components/background";
+import DesktopMusicDetail from "./desktop";
 import Bottom from "./components/bottom";
 import Content from "./components/content";
 import Lyric from "./components/content/lyric";
@@ -26,6 +27,11 @@ export default function MusicDetail() {
             }
         };
     }, []);
+
+    // 桌面端走专用宽屏布局，移动端保持原样
+    if (Platform.OS === "web") {
+        return <DesktopMusicDetail />;
+    }
 
     return (
         <>

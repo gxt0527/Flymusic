@@ -14,6 +14,7 @@ import globalStyle from "@/constants/globalStyle";
 import musicHistory from "@/core/musicHistory";
 import MusicSheet from "@/core/musicSheet";
 import { useI18N } from "@/core/i18n";
+import { useLayoutMode } from "@/components/layout";
 
 export default function Body() {
     const { musicSheet } = useParams<"music-list-editor">();
@@ -27,9 +28,10 @@ export default function Body() {
         () => editingMusicList.filter(_ => _.checked),
         [editingMusicList],
     );
+    const desktop = useLayoutMode() !== "tab";
     return (
         <HorizontalSafeAreaView style={globalStyle.flex1}>
-            <View style={style.header}>
+            <View style={[style.header, desktop && style.headerDesktop]}>
                 <Button
                     onPress={() => {
                         if (
@@ -99,5 +101,10 @@ const style = StyleSheet.create({
         paddingHorizontal: rpx(24),
         alignItems: "center",
         justifyContent: "space-between",
+    },
+    /** 桌面：与其它页面一致的 56 高工具条、20 左右留白 */
+    headerDesktop: {
+        height: 56,
+        paddingHorizontal: 20,
     },
 });

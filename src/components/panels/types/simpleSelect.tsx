@@ -4,6 +4,7 @@ import rpx from "@/utils/rpx";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PanelBase from "../base/panelBase";
 import { hidePanel } from "../usePanel";
+import type { IPanelAnchor } from "../anchor";
 import ListItem from "@/components/base/listItem";
 import PanelHeader from "../base/panelHeader";
 
@@ -16,6 +17,8 @@ interface ISimpleSelectProps {
     height?: number;
     header?: string;
     candidates?: Array<ICandidateItem>;
+    /** 桌面端：挂在触发按钮上展开（移动端忽略） */
+    anchor?: IPanelAnchor;
     onPress?: (item: ICandidateItem) => void;
 }
 

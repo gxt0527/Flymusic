@@ -39,6 +39,7 @@ import minDistance from "@/utils/minDistance";
 import { IPluginManager } from "@/types/core/pluginManager";
 import { ImgAsset } from "@/constants/assetsConst";
 import { resolveImportedAssetOrPath } from "@/utils/fileUtils";
+import { IMPORT_KEY_FIELD } from "@/core/importPlaylist/types";
 
 
 
@@ -46,6 +47,25 @@ const currentMusicAtom = atom<IMusic.IMusicItem | null>(null);
 const repeatModeAtom = atom<MusicRepeatMode>(MusicRepeatMode.QUEUE);
 const qualityAtom = atom<IMusic.IQualityKey>("standard");
 const playListAtom = atom<IMusic.IMusicItem[]>([]);
+
+/**
+ * 给播放队列条目打上「入队时间 / 顺序」标记。
+ *
+ * 搜索结果、歌单详情等来自 jotai / immer 的 mediaItem 可能是被冻结的对象，
+ * 直接写入 Symbol 会抛 TypeError: Cannot add property ... object is not extensible，
+ * 表现为「点播插件音源没反应、队列为空」。这里统一浅拷贝后再打标，
+ * 不修改调用方持有的状态对象。
+ */
+function stampMusicItems(
+    musicItems: IMusic.IMusicItem[],
+    now = Date.now(),
+): IMusic.IMusicItem[] {
+    return musicItems.map((item, index) => ({
+        ...item,
+        [timeStampSymbol]: now,
+        [sortIndexSymbol]: index,
+    }));
+}
 
 
 class TrackPlayer extends EventEmitter<{
@@ -67,6 +87,8 @@ class TrackPlayer extends EventEmitter<{
     private serviceInited = false;
     // 播放队列索引map
     private playListIndexMap = createMediaIndexMap([] as IMusic.IMusicItem[]);
+    /** 连续「无可用音源」的次数，用来在整队都播不了时收尾，防止无限切歌 */
+    private sourceFailStreak = 0;
 
 
     private static maxMusicQueueLength = 10000;
@@ -280,22 +302,19 @@ class TrackPlayer extends EventEmitter<{
         beforeIndex?: number,
         shouldShuffle?: boolean,
     ): void {
-        const now = Date.now();
+        // 浅拷贝打标，避免写入被冻结的状态对象
+        const stampedItems = stampMusicItems(musicItems);
         let newPlayList: IMusic.IMusicItem[] = [];
         let currentPlayList = this.playList;
-        musicItems.forEach((item, index) => {
-            item[timeStampSymbol] = now;
-            item[sortIndexSymbol] = index;
-        });
 
         if (beforeIndex === undefined || beforeIndex < 0) {
             // 1.1. 添加到歌单末尾，并过滤掉已有的歌曲
             newPlayList = currentPlayList.concat(
-                musicItems.filter(item => !this.isInPlayList(item)),
+                stampedItems.filter(item => !this.isInPlayList(item)),
             );
         } else {
             // 1.2. 新的播放列表，插入
-            const indexMap = createMediaIndexMap(musicItems);
+            const indexMap = createMediaIndexMap(stampedItems);
             const beforeDraft = currentPlayList
                 .slice(0, beforeIndex)
                 .filter(item => !indexMap.has(item));
@@ -303,7 +322,7 @@ class TrackPlayer extends EventEmitter<{
                 .slice(beforeIndex)
                 .filter(item => !indexMap.has(item));
 
-            newPlayList = [...beforeDraft, ...musicItems, ...afterDraft];
+            newPlayList = [...beforeDraft, ...stampedItems, ...afterDraft];
         }
 
         // 如果太长了
@@ -406,6 +425,9 @@ class TrackPlayer extends EventEmitter<{
             if (!musicItem) {
                 throw new Error(PlayFailReason.PLAY_LIST_IS_EMPTY);
             }
+            // 调用方（搜索结果、歌单等）可能传入被冻结的状态对象；
+            // 后续 setCurrentMusic / 历史记录会补写字段，这里先做一次浅拷贝解冻结。
+            musicItem = { ...musicItem };
             // 1. 移动网络禁止播放
             const localPath = getLocalPath(musicItem);
             if (
@@ -616,8 +638,8 @@ class TrackPlayer extends EventEmitter<{
                     });
                 }
             } else if (message === PlayFailReason.INVALID_SOURCE) {
-                trace("音源为空，播放失败");
-                await this.handlePlayFail();
+                // 无音源不弹提示、不占着失败曲目，直接交给跳过逻辑
+                await this.handlePlayFail(PlayFailReason.INVALID_SOURCE);
             } else if (message === PlayFailReason.PLAY_LIST_IS_EMPTY) {
                 // 队列是空的，不应该出现这种情况
             }
@@ -716,15 +738,12 @@ class TrackPlayer extends EventEmitter<{
                 );
             }
 
-            newPlayList.forEach((it, index) => {
-                it[timeStampSymbol] = now;
-                it[sortIndexSymbol] = index;
-            });
+            const stampedPlayList = stampMusicItems(newPlayList, now);
 
             this.setPlayList(
                 this.repeatMode === MusicRepeatMode.SHUFFLE
-                    ? shuffle(newPlayList)
-                    : newPlayList,
+                    ? shuffle(stampedPlayList)
+                    : stampedPlayList,
             );
             await this.play(musicItem, true);
         }
@@ -739,6 +758,10 @@ class TrackPlayer extends EventEmitter<{
     getRate = ReactNativeTrackPlayer.getRate;
     setRate = ReactNativeTrackPlayer.setRate;
     reset = ReactNativeTrackPlayer.reset;
+
+    /** 音量（0~1）。桌面端底栏音量条使用；移动端不暴露此 UI。 */
+    setVolume = (volume: number) =>
+        ReactNativeTrackPlayer.setVolume(Math.min(1, Math.max(0, volume)));
 
 
     /**************** 辅助函数 -- 设置内部状态 ****************/
@@ -755,7 +778,11 @@ class TrackPlayer extends EventEmitter<{
             return;
         }
         if (typeof musicItem.artwork !== "string") {
-            musicItem.artwork = ImgAsset.albumDefault;
+            // 不原地写入：remove() 等路径传入的是 immer produce 后的冻结对象
+            musicItem = {
+                ...musicItem,
+                artwork: ImgAsset.albumDefault,
+            };
         }
         this.currentIndex = this.getMusicIndexInPlayList(musicItem);
         getDefaultStore().set(currentMusicAtom, musicItem);
@@ -805,6 +832,7 @@ class TrackPlayer extends EventEmitter<{
         await ReactNativeTrackPlayer.setQueue([clonedTrack, this.getFakeNextTrack()]);
         PersistStatus.set("music.musicItem", track as IMusic.IMusicItem);
         PersistStatus.set("music.progress", 0);
+        this.sourceFailStreak = 0;
         if (autoPlay) {
             await ReactNativeTrackPlayer.play();
         }
@@ -903,12 +931,57 @@ class TrackPlayer extends EventEmitter<{
     }
 
 
-    private async handlePlayFail() {
-        // 如果自动跳转下一曲, 500s后自动跳转
-        if (!this.configService.getConfig("basic.autoStopWhenError")) {
-            await delay(500);
-            await this.skipToNext();
+    /** 导入歌单里「未找到音源」的占位曲目，以及既无插件也无本地地址的条目 */
+    private isUnavailable(musicItem?: IMusic.IMusicItem | null): boolean {
+        if (!musicItem) {
+            return true;
         }
+        if (musicItem[IMPORT_KEY_FIELD]) {
+            return true;
+        }
+        return (
+            !musicItem.platform &&
+            !musicItem.url &&
+            !musicItem.source &&
+            !getLocalPath(musicItem)
+        );
+    }
+
+    /** 整队都播不了：清掉当前曲目和占位音轨，别让界面停在播不出来的歌上 */
+    private async stopAfterAllSourceFailed() {
+        this.sourceFailStreak = 0;
+        this.setCurrentMusic(null);
+        await ReactNativeTrackPlayer.reset();
+        PersistStatus.set("music.musicItem", undefined);
+        PersistStatus.set("music.progress", 0);
+    }
+
+    private async handlePlayFail(reason?: string) {
+        if (reason !== PlayFailReason.INVALID_SOURCE) {
+            // 真实音源加载失败仍沿用「播放失败时自动暂停」的开关语义
+            if (!this.configService.getConfig("basic.autoStopWhenError")) {
+                await delay(500);
+                await this.skipToNext();
+            }
+            return;
+        }
+
+        const len = this.playList.length;
+        this.sourceFailStreak += 1;
+        if (len === 0 || this.sourceFailStreak > len) {
+            await this.stopAfterAllSourceFailed();
+            return;
+        }
+
+        // 不等待、不弹提示，按队列顺序找下一首有音源的曲目
+        for (let step = 1; step <= len; step++) {
+            const next = this.getPlayListMusicAt(this.currentIndex + step);
+            if (next && !this.isUnavailable(next)) {
+                await this.play(next, true);
+                return;
+            }
+        }
+        await this.stopAfterAllSourceFailed();
     }
 
     /**

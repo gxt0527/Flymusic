@@ -48,4 +48,11 @@ const pageStatusAtom = atom<PageStatus>(PageStatus.EDITING);
 
 const queryAtom = atom<string>("");
 
-export { pageStatusAtom, searchResultsAtom, queryAtom };
+/**
+ * 搜索历史下拉浮层是否展开。
+ * 桌面端搜索框获得焦点时展开，点击其它区域 / 提交搜索 / 页面卸载时收起。
+ * 与 pageStatus 解耦：关闭浮层不等于离开编辑态。
+ */
+const historyVisibleAtom = atom<boolean>(false);
+
+export { pageStatusAtom, searchResultsAtom, queryAtom, historyVisibleAtom };

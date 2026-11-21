@@ -1,38 +1,20 @@
 import React, { memo } from "react";
 import { StyleSheet, View } from "react-native";
-import Image from "./image";
 import useColors from "@/hooks/useColors";
-import Theme from "@/core/theme";
 
 function PageBackground() {
-    const theme = Theme.useTheme();
-    const background = Theme.useBackground();
     const colors = useColors();
 
     return (
-        <>
-            <View
-                style={[
-                    style.wrapper,
-                    {
-                        backgroundColor:
-                            colors?.pageBackground ?? colors.background,
-                    },
-                ]}
-            />
-            {!theme.id.startsWith("p-") && background?.url ? (
-                <Image
-                    uri={background.url}
-                    style={[
-                        style.wrapper,
-                        {
-                            opacity: background?.opacity ?? 0.6,
-                        },
-                    ]}
-                    blurRadius={background?.blur ?? 20}
-                />
-            ) : null}
-        </>
+        <View
+            style={[
+                style.wrapper,
+                {
+                    backgroundColor:
+                        colors?.pageBackground ?? colors.background,
+                },
+            ]}
+        />
     );
 }
 export default memo(PageBackground, () => true);

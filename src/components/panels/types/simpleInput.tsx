@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import rpx, { vmax } from "@/utils/rpx";
 import { fontSizeConst } from "@/constants/uiConst";
 import useColors from "@/hooks/useColors";
@@ -39,7 +39,7 @@ export default function SimpleInput(props: ISimpleInputProps) {
     return (
         <PanelBase
             keyboardAvoidBehavior="height"
-            height={vmax(30)}
+            height={Platform.OS === "web" ? 280 : vmax(30)}
             renderBody={() => (
                 <>
                     <PanelHeader

@@ -15,12 +15,14 @@ interface ILyricItemComponentProps {
     text?: string;
     // 字体大小
     fontSize?: number;
+    /** 桌面端「歌词-对齐方式」设置（仅 Web 生效） */
+    textAlign?: "left" | "center" | "right";
 
     onLayout?: (index: number, height: number) => void;
 }
 
 function _LyricItemComponent(props: ILyricItemComponentProps) {
-    const { light, highlight, text, onLayout, index, fontSize } = props;
+    const { light, highlight, text, onLayout, index, fontSize, textAlign } = props;
 
     const colors = useColors();
 
@@ -36,6 +38,7 @@ function _LyricItemComponent(props: ILyricItemComponentProps) {
                 {
                     fontSize: fontSize || fontSizeConst.content,
                 },
+                textAlign ? { textAlign } : null,
                 highlight
                     ? [
                         lyricStyles.highlightItem,
@@ -58,7 +61,8 @@ const LyricItemComponent = memo(
         prev.highlight === curr.highlight &&
         prev.text === curr.text &&
         prev.index === curr.index &&
-        prev.fontSize === curr.fontSize,
+        prev.fontSize === curr.fontSize &&
+        prev.textAlign === curr.textAlign,
 );
 
 export default LyricItemComponent;

@@ -10,7 +10,7 @@ import rpx from "@/utils/rpx";
 import Color from "color";
 import { useAtom, useSetAtom } from "jotai";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Platform, View } from "react-native";
 import { addHistory } from "../common/historySearch";
 import useSearch from "../hooks/useSearch";
 import {
@@ -126,6 +126,8 @@ const style = StyleSheet.create({
         height: rpx(64),
         maxHeight: rpx(64),
         alignItems: "center",
+        /** 宽屏下别拉成一整条，与首页顶栏的搜索胶囊保持同一量级 */
+        ...(Platform.OS === "web" ? { maxWidth: 480 } : null),
     },
     magnify: {
         position: "absolute",

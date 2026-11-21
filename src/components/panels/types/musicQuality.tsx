@@ -7,6 +7,7 @@ import { qualityKeys, qualityText } from "@/utils/qualities";
 import { sizeFormatter } from "@/utils/fileUtils";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PanelBase from "../base/panelBase";
+import type { IPanelAnchor } from "../anchor";
 import { ScrollView } from "react-native-gesture-handler";
 import { hidePanel } from "../usePanel";
 import Divider from "@/components/base/divider";
@@ -17,6 +18,8 @@ interface IMusicQualityProps {
     type?: "play" | "download";
     /** 歌曲信息 */
     musicItem: IMusic.IMusicItem;
+    /** 桌面端：挂在触发按钮上展开（移动端忽略） */
+    anchor?: IPanelAnchor;
     /** 点击回调 */
     onQualityPress: (
         quality: IMusic.IQualityKey,

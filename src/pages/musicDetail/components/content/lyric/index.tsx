@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LayoutRectangle, StyleSheet, Text, View } from "react-native";
+import { LayoutRectangle, Platform, StyleSheet, Text, View } from "react-native";
 import rpx from "@/utils/rpx";
 import useDelayFalsy from "@/hooks/useDelayFalsy";
 import { FlatList, Gesture, GestureDetector, TapGestureHandler } from "react-native-gesture-handler";
@@ -17,8 +17,13 @@ import LyricOperations from "./lyricOperations";
 import { IParsedLrcItem } from "@/utils/lrcParser";
 import { IconButtonWithGesture } from "@/components/base/iconButton.tsx";
 import { getMediaExtraProperty } from "@/utils/mediaExtra";
-import lyricManager, { useCurrentLyricItem, useLyricState } from "@/core/lyricManager";
+import lyricManager, {
+    useCurrentLyricItem,
+    useLyricSeekVersion,
+    useLyricState,
+} from "@/core/lyricManager";
 import { useI18N } from "@/core/i18n";
+import { useAppConfig } from "@/core/appConfig";
 
 const ITEM_HEIGHT = rpx(92);
 
@@ -31,7 +36,7 @@ interface IProps {
     onTurnPageClick?: () => void;
 }
 
-const fontSizeMap = {
+export const fontSizeMap = {
     0: rpx(24),
     1: rpx(30),
     2: rpx(36),
@@ -44,17 +49,68 @@ export default function Lyric(props: IProps) {
     const { loading, meta, lyrics, hasTranslation } =
         useLyricState();
     const currentLrcItem = useCurrentLyricItem();
+    const seekVersion = useLyricSeekVersion();
     const showTranslation = PersistStatus.useValue(
         "lyric.showTranslation",
         false,
     );
     const fontSizeKey = PersistStatus.useValue("lyric.detailFontSize", 1);
+    /**
+     * 设置页「歌词」分区的四个滑块在 Windows 端原本只喂给状态栏歌词，
+     * 而桌面端 LyricUtil 是空实现，导致它们完全无效。这里改为让播放页
+     * 歌词直接读取同一份配置，拖动滑块即时生效；移动端保持原行为。
+     */
+    const desktopLeftPercent = useAppConfig("lyric.leftPercent");
+    const desktopTopPercent = useAppConfig("lyric.topPercent");
+    const desktopWidthPercent = useAppConfig("lyric.widthPercent");
+    const desktopFontSize = useAppConfig("lyric.fontSize");
+    const desktopAlign = useAppConfig("lyric.align");
+
     const fontSizeStyle = useMemo(
         () => ({
-            fontSize: fontSizeMap[fontSizeKey!],
+            fontSize:
+                Platform.OS === "web" && desktopFontSize
+                    ? desktopFontSize
+                    : fontSizeMap[fontSizeKey!],
         }),
-        [fontSizeKey],
+        [fontSizeKey, desktopFontSize],
     );
+
+    /** 左右距离 → 歌词区水平内边距；歌词宽度 → 歌词列表最大宽度 */
+    const desktopLyricStyle = useMemo(() => {
+        if (Platform.OS !== "web") {
+            return null;
+        }
+        const lp = desktopLeftPercent ?? 0.5;
+        const wp = desktopWidthPercent ?? 1;
+        return {
+            paddingHorizontal: Math.round(lp * 40),
+            maxWidth: `${Math.max(30, Math.min(100, Math.round(wp * 100)))}%` as any,
+            alignSelf: "center" as const,
+        };
+    }, [desktopLeftPercent, desktopWidthPercent]);
+
+    /** 上下距离 → 歌词列表顶部留白 */
+    const desktopLyricContentStyle = useMemo(() => {
+        if (Platform.OS !== "web") {
+            return null;
+        }
+        return { paddingTop: Math.round((desktopTopPercent ?? 0) * 160) };
+    }, [desktopTopPercent]);
+
+    /** 对齐方式（NativeTextAlignment: 3 左 / 5 右 / 17 居中） */
+    const desktopLyricAlign = useMemo(() => {
+        if (Platform.OS !== "web") {
+            return undefined;
+        }
+        if (desktopAlign === 3) {
+            return "left" as const;
+        }
+        if (desktopAlign === 5) {
+            return "right" as const;
+        }
+        return "center" as const;
+    }, [desktopAlign]);
 
     const [draggingIndex, setDraggingIndex, setDraggingIndexImmi] =
         useDelayFalsy<number | undefined>(undefined, 2000);
@@ -163,6 +219,39 @@ export default function Lyric(props: IProps) {
         };
     }, []);
 
+    /**
+     * 手动跳转播放进度（点/拖进度条）后：立刻快滑到目标行。
+     * 不走上面那个 effect —— 它为了「暂停时不打断用户翻歌词」做了暂停拦截，
+     * 而点击进度条正是希望暂停状态下歌词也跟着跳。
+     */
+    useEffect(() => {
+        if (!seekVersion) {
+            return;
+        }
+        // 等一帧：atom 刚更新时 currentLyricItem 已经落库，但列表可能还没重排
+        const timer = setTimeout(() => {
+            if (isMountedRef.current) {
+                scrollToCurrentLrcItem();
+            }
+        }, 0) as any;
+        return () => clearTimeout(timer);
+    }, [seekVersion, scrollToCurrentLrcItem]);
+
+    /**
+     * 歌词滚动条：默认不可见，鼠标进入歌词区域才显示（与歌词字号/偏移工具同一套交互）。
+     * 样式在 web/index.html 的 .fly-lyric-scroll 里，这里只负责把 class 挂到
+     * FlatList 真正的滚动节点上；虚拟列表重建节点后需要重新挂一次。
+     */
+    useEffect(() => {
+        if (Platform.OS !== "web") {
+            return;
+        }
+        const node: any = (listRef.current as any)?.getScrollableNode?.();
+        if (node?.classList && !node.classList.contains("fly-lyric-scroll")) {
+            node.classList.add("fly-lyric-scroll");
+        }
+    }, [lyrics, layout]);
+
     // 开始滚动时拖拽生效
     const onScrollBeginDrag = () => {
         dragShownRef.current = true;
@@ -222,12 +311,30 @@ export default function Lyric(props: IProps) {
         })
         .runOnJS(true);
 
+    /**
+     * 歌词操作行，只在移动端渲染（放在底部，贴着播放控制，符合拇指操作）。
+     *
+     * 桌面端不渲染这一整排：字号与「歌词进度偏移」都挪到了底部播放条右侧，
+     * 搜索歌词 / 翻译 / 更多 三项已在桌面端移除，不再渲染这排图标。
+     */
+    const operationsNode = (
+        <View style={styles.operationsWrap}>
+            <LyricOperations scrollToCurrentLrcItem={delayedScrollToCurrentLrcItem} />
+        </View>
+    );
+
     return (
         <>
             <GestureDetector gesture={tapGesture}>
-                <View style={globalStyle.fwflex1}>
+                <View
+                    style={[
+                        globalStyle.fwflex1,
+                        desktopLyricStyle,
+                        desktopLyricContentStyle,
+                    ]}>
                     {loading ? (
-                        <Loading color="white" />
+                        // 歌词还在拉取时，就在歌词显示位置给一句提示，加载完自然消失
+                        <Loading color="white" text={t("lyric.loadingLyric")} />
                     ) : lyrics?.length ? (
                         <FlatList
                             ref={_ => {
@@ -307,6 +414,7 @@ export default function Lyric(props: IProps) {
                                         index={index}
                                         text={text}
                                         fontSize={fontSizeStyle.fontSize}
+                                        textAlign={desktopLyricAlign}
                                         onLayout={handleLyricItemLayout}
                                         light={draggingIndex === index}
                                         highlight={
@@ -318,7 +426,14 @@ export default function Lyric(props: IProps) {
                         />
                     ) : (
                         <View style={globalStyle.fullCenter}>
-                            <Text style={[styles.white, fontSizeStyle]}>
+                            <Text
+                                style={[
+                                    styles.white,
+                                    fontSizeStyle,
+                                    desktopLyricAlign
+                                        ? { textAlign: desktopLyricAlign }
+                                        : null,
+                                ]}>
                                 {t("lyric.noLyric")}
                             </Text>
                             <TapGestureHandler
@@ -364,14 +479,18 @@ export default function Lyric(props: IProps) {
                     )}
                 </View>
             </GestureDetector>
-            <LyricOperations
-                scrollToCurrentLrcItem={delayedScrollToCurrentLrcItem}
-            />
+            {Platform.OS === "web" ? null : operationsNode}
         </>
     );
 }
 
 const styles = StyleSheet.create({
+    /**
+     * 歌词操作行的容器。只有移动端渲染，整行铺满、图标两端分布。
+     */
+    operationsWrap: {
+        width: "100%",
+    },
     wrapper: {
         width: "100%",
         marginVertical: rpx(48),
@@ -431,12 +550,14 @@ const styles = StyleSheet.create({
         color: "white",
     },
     searchLyric: {
-        width: rpx(180),
+        /** 按内容自适应宽度：字号调大 / 歌词宽度调小时不要把「搜索歌词」挤折行 */
+        minWidth: rpx(180),
         marginTop: rpx(14),
+        paddingHorizontal: rpx(24),
         paddingVertical: rpx(10),
         textAlign: "center",
         alignSelf: "center",
-        color: "#66eeff",
+        color: "#5DD3A9",
         textDecorationLine: "underline",
     },
 });

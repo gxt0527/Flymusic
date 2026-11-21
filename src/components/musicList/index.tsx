@@ -1,4 +1,10 @@
 import { RequestStateCode } from "@/constants/commonConst";
+import ImportPlaylist from "@/core/importPlaylist";
+import {
+    ImportItemStatus,
+    IMPORT_KEY_FIELD,
+    IMPORT_STATUS_FIELD,
+} from "@/core/importPlaylist/types";
 import TrackPlayer from "@/core/trackPlayer";
 import rpx from "@/utils/rpx";
 import { FlashList } from "@shopify/flash-list";
@@ -7,6 +13,10 @@ import { FlatListProps, Pressable, StyleSheet, View } from "react-native";
 import ListEmpty from "../base/listEmpty";
 import ListFooter from "../base/listFooter";
 import MusicItem from "../mediaItem/musicItem";
+import DesktopMusicItem from "./desktopItem";
+import DesktopMusicHeader from "./desktopHeader";
+import { columnSize } from "./desktopColumns";
+import { useLayoutMode } from "@/components/layout";
 import { isSameMediaItem } from "@/utils/mediaUtils";
 import Icon from "../base/icon";
 import { iconSizeConst } from "@/constants/uiConst";
@@ -21,6 +31,11 @@ interface IMusicListProps {
     musicSheet?: IMusic.IMusicSheetItem;
     /** 是否展示序号 */
     showIndex?: boolean;
+    /**
+     * 桌面端表格形态：加表头（# / 标题 / 专辑 / 喜欢 / 时长）和专辑列。
+     * 只在整页级的歌单列表里开，浮层里的匹配列表太窄，开了会挤。
+     */
+    desktopTable?: boolean;
     /** 点击 */
     onItemPress?: (
         musicItem: IMusic.IMusicItem,
@@ -32,6 +47,14 @@ interface IMusicListProps {
     highlightMusicItem?: IMusic.IMusicItem | null;
     onRetry?: () => void;
     onLoadMore?: () => void;
+    /** 桌面端列表内边距覆盖（例如播放记录页要把左侧缩到很窄） */
+    desktopPadding?: { left?: number; right?: number };
+    /**
+     * 桌面端第二行文案覆盖。
+     * 本地音乐的曲目一般没有 artist 标签，显示「未知歌手」等于没信息，
+     * 调用方可以改成显示文件路径。
+     */
+    getSubtitle?: (musicItem: IMusic.IMusicItem) => string | undefined;
 }
 const ITEM_HEIGHT = rpx(120);
 
@@ -42,13 +65,18 @@ export default function MusicList(props: IMusicListProps) {
         musicList,
         musicSheet,
         showIndex,
+        desktopTable,
         onItemPress,
         state,
         onRetry,
         onLoadMore,
         highlightMusicItem,
+        getSubtitle,
     } = props;    
     const colors = useColors();
+    const layoutMode = useLayoutMode();
+    // 桌面端换成 64 高的紧凑行（44 封面、无序号、无分割线），移动端保持原样
+    const isDesktop = layoutMode !== "tab";
     const flashListRef = useRef<FlashList<IMusic.IMusicItem>>(null);
     const [showBadge, setShowBadge] = useState(false);
     const hideTimeoutRef = useRef<NodeJS.Timeout>();
@@ -107,8 +135,30 @@ export default function MusicList(props: IMusicListProps) {
     
     return (
         <View style={styles.container}>
+            {isDesktop && desktopTable ? (
+                <View
+                    style={[
+                        styles.desktopHeader,
+                        {
+                            paddingLeft: props.desktopPadding?.left ?? 20,
+                            paddingRight: props.desktopPadding?.right ?? 20,
+                        },
+                    ]}>
+                    <DesktopMusicHeader showIndex showAlbum />
+                </View>
+            ) : null}
             <FlashList
                 ref={flashListRef}
+                /**
+                 * 常驻滚动条：表头在滚动容器外面，只有滚动条宽度恒定为 8px，
+                 * 表头补的那 8px 才永远对得上（见 desktopColumns.scrollbar）。
+                 * 用 auto 的话，列表不满一屏时行区宽 8px，表头就偏右了。
+                 * FlashList 自己的 style 不会落到滚动容器上，只有 overrideProps
+                 * 会被拼进 ScrollView 的 props，所以只能从这里给。
+                 */
+                overrideProps={{
+                    style: { minHeight: 1, minWidth: 1, overflowY: "scroll" },
+                }}
                 ListHeaderComponent={Header}
                 ListEmptyComponent={<ListEmpty state={state} onRetry={onRetry} />}
                 ListFooterComponent={
@@ -116,27 +166,98 @@ export default function MusicList(props: IMusicListProps) {
                 }
                 extraData={highlightMusicItem}
                 data={musicList ?? []}
-                estimatedItemSize={ITEM_HEIGHT}
+                estimatedItemSize={isDesktop ? columnSize.rowHeight : ITEM_HEIGHT}
+                contentContainerStyle={
+                    isDesktop
+                        ? ({
+                            paddingHorizontal: 20,
+                            paddingLeft: props.desktopPadding?.left ?? 20,
+                            paddingRight: props.desktopPadding?.right ?? 20,
+                            paddingTop: 4,
+                            paddingBottom: 20,
+                        } as any)
+                        : undefined
+                }
                 onScrollBeginDrag={handleScrollBegin}
                 onScrollEndDrag={handleScrollEnd}
                 onMomentumScrollEnd={handleScrollEnd}
                 renderItem={({ index, item: musicItem }) => {
+                    // 导入歌单的占位曲目：从歌曲自身字段读状态，
+                    // 不依赖匹配任务是否还在内存里（重启 App 后依然能显示灰色/重试）
+                    const importKey = musicItem[IMPORT_KEY_FIELD] as
+                        | string
+                        | undefined;
+                    const importStatus = musicItem[IMPORT_STATUS_FIELD] as
+                        | ImportItemStatus
+                        | undefined;
+                    const showImportState =
+                        !!importKey && importStatus !== "resolved";
+                    const sheetId = musicSheet?.id;
+                    const onImportRetry =
+                        importKey && sheetId
+                            ? () =>
+                                void ImportPlaylist.retry(sheetId, importKey)
+                            : undefined;
+                    const onImportSearchMore =
+                        importKey && sheetId
+                            ? () =>
+                                void ImportPlaylist.searchMore(
+                                    sheetId,
+                                    importKey,
+                                )
+                            : undefined;
+
+                    const handlePress = () => {
+                        // 未匹配到音源的占位曲目不能进入播放列表
+                        const playableList = (musicList ?? [musicItem]).filter(
+                            it => !it[IMPORT_KEY_FIELD],
+                        );
+                        if (onItemPress) {
+                            onItemPress(musicItem, playableList);
+                        } else {
+                            TrackPlayer.playWithReplacePlayList(
+                                musicItem,
+                                playableList.length
+                                    ? playableList
+                                    : [musicItem],
+                            );
+                        }
+                    };
+
+                    if (isDesktop) {
+                        return (
+                            <DesktopMusicItem
+                                musicItem={musicItem}
+                                musicSheet={musicSheet}
+                                subtitle={getSubtitle?.(musicItem)}
+                                index={showIndex ? index + 1 : undefined}
+                                showAlbum={!!desktopTable}
+                                highlight={isSameMediaItem(
+                                    musicItem,
+                                    highlightMusicItem,
+                                )}
+                                onPress={handlePress}
+                                importStatus={
+                                    showImportState ? importStatus : undefined
+                                }
+                                onImportRetry={onImportRetry}
+                                onImportSearchMore={onImportSearchMore}
+                            />
+                        );
+                    }
+
                     return (
                         <MusicItem
                             musicItem={musicItem}
                             index={showIndex ? index + 1 : undefined}
-                            onItemPress={() => {
-                                if (onItemPress) {
-                                    onItemPress(musicItem, musicList);
-                                } else {
-                                    TrackPlayer.playWithReplacePlayList(
-                                        musicItem,
-                                        musicList ?? [musicItem],
-                                    );
-                                }
-                            }}
+                            onItemPress={handlePress}
                             musicSheet={musicSheet}
                             highlight={isSameMediaItem(musicItem, highlightMusicItem)}
+                            importStatus={
+                                showImportState ? importStatus : undefined
+                            }
+                            onImportRetry={onImportRetry}
+                            onImportSearchMore={onImportSearchMore}
                         />
                     );
                 }}
@@ -168,6 +289,14 @@ export default function MusicList(props: IMusicListProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    desktopContent: {
+        paddingHorizontal: 20,
+        paddingTop: 4,
+        paddingBottom: 20,
+    },
+    desktopHeader: {
+        paddingTop: 4,
     },
     badge: {
         position: "absolute",

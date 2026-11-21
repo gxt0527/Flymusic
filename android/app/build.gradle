@@ -114,7 +114,7 @@ static def getVersion() {
 // }
 
 def appVersion = getVersion()
-def appVersionCode = 400011
+def appVersionCode = 400036
 
 
 android {
@@ -139,11 +139,16 @@ android {
             keyPassword 'android'
         }
         // !! Add lines
-         release {
-            storeFile file(keystoreProperties['RELEASE_STORE_FILE'])
-            storePassword keystoreProperties['RELEASE_STORE_PASSWORD']
-            keyAlias keystoreProperties['RELEASE_KEY_ALIAS']
-            keyPassword keystoreProperties['RELEASE_KEY_PASSWORD']
+        // keystore.properties 是作者本地私有文件、未随仓库分发。
+        // 不加这层判断，任何新克隆在 Gradle 配置阶段就会因 file(null) 直接失败
+        // （报错指向 storeFile 那一行，与 debug 构建无关，容易误判）。
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['RELEASE_STORE_FILE'])
+                storePassword keystoreProperties['RELEASE_STORE_PASSWORD']
+                keyAlias keystoreProperties['RELEASE_KEY_ALIAS']
+                keyPassword keystoreProperties['RELEASE_KEY_PASSWORD']
+            }
         }
     }
     splits {

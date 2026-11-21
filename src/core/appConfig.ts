@@ -96,11 +96,6 @@ class AppConfig implements IAppConfig {
                 ["setting.lyric.autoSearchLyric", "lyric.autoSearchLyric"],
 
                 // Theme
-                ["setting.theme.background", "theme.background"],
-                ["setting.theme.backgroundOpacity", "theme.backgroundOpacity"],
-                ["setting.theme.backgroundBlur", "theme.backgroundBlur"],
-                ["setting.theme.colors", "theme.colors"],
-                ["setting.theme.customColors", "theme.customColors"],
                 ["setting.theme.followSystem", "theme.followSystem"],
                 ["setting.theme.selectedTheme", "theme.selectedTheme"],
 
@@ -188,16 +183,32 @@ class AppConfig implements IAppConfig {
     ): IAppConfigProperties[K] | undefined {
         const value = configStore.getString(key);
         if (value === undefined) {
-            return undefined;
+            // 没显式设置过时走默认值；用户手动关掉后仍保留 false
+            return defaultAppConfig[key];
         }
         return JSON.parse(value);
     }
 }
 
+/**
+ * 配置默认值表。只放「用户没设置过」时的兜底值，
+ * 不要用于覆盖 MMKV 里已存在的值（含用户主动设的 false）。
+ */
+const defaultAppConfig: Partial<IAppConfigProperties> = {
+    "lyric.autoSearchLyric": true,
+    // 桌面端默认「关闭窗口后继续在托盘后台运行」，与移动端行为无关
+    "basic.closeAction": "tray",
+};
+export function getDefaultAppConfig<
+    K extends keyof IAppConfigProperties,
+>(key: K): IAppConfigProperties[K] | undefined {
+    return defaultAppConfig[key];
+}
 const appConfig = new AppConfig();
 export default appConfig;
 
 /***** hooks *****/
 export function useAppConfig<K extends keyof IAppConfigProperties>(key: K): IAppConfigProperties[K] | undefined {
-    return useMMKVObject<IAppConfigProperties[K]>(key, configStore)[0];
+    const value = useMMKVObject<IAppConfigProperties[K]>(key, configStore)[0];
+    return value ?? getDefaultAppConfig(key);
 }

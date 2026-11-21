@@ -8,7 +8,7 @@ import { ImgAsset } from "@/constants/assetsConst";
 import { localPluginPlatform } from "@/constants/commonConst";
 import { useI18N } from "@/core/i18n";
 import MusicSheet, { useSheetsBase, useStarredSheets } from "@/core/musicSheet";
-import { ROUTE_PATH, useNavigate } from "@/core/router";
+import { ROUTE_PATH, useNavigate, useOpenSheetDetail } from "@/core/router";
 import useColors from "@/hooks/useColors";
 import rpx from "@/utils/rpx";
 import Toast from "@/utils/toast";
@@ -21,6 +21,7 @@ export default function Sheets() {
     const [index, setIndex] = useState(0);
     const colors = useColors();
     const navigate = useNavigate();
+    const openSheetDetail = useOpenSheetDetail();
 
     const allSheets = useSheetsBase();
     const staredSheets = useStarredSheets();
@@ -108,7 +109,7 @@ export default function Sheets() {
                         sizeType="normal"
                         accessibilityLabel={t("home.importPlaylist.a11y")}
                         onPress={() => {
-                            showPanel("ImportMusicSheet");
+                            showPanel("ImportPlaylist");
                         }}
                     />
                 </View>
@@ -131,7 +132,7 @@ export default function Sheets() {
                             withHorizontalPadding
                             onPress={() => {
                                 if (isLocalSheet) {
-                                    navigate(ROUTE_PATH.LOCAL_SHEET_DETAIL, {
+                                    openSheetDetail({
                                         id: sheet.id,
                                     });
                                 } else {

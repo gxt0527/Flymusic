@@ -1,4 +1,5 @@
 import React from "react";
+import { StyleSheet, View } from "react-native";
 import TopListBody from "./components/topListBody";
 import MusicBar from "@/components/musicBar";
 import VerticalSafeAreaView from "@/components/base/verticalSafeAreaView";
@@ -14,9 +15,20 @@ export default function TopList() {
         <VerticalSafeAreaView style={globalStyle.fwflex1}>
             <AppBar withStatusBar>{t("topList.title")}</AppBar>
             <HorizontalSafeAreaView style={globalStyle.flex1}>
-                <TopListBody />
+                {/* 与首页同宽：不再限宽居中，内容区左右各 20 */}
+                <View style={styles.measure}>
+                    <TopListBody />
+                </View>
             </HorizontalSafeAreaView>
             <MusicBar />
         </VerticalSafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    measure: {
+        flex: 1,
+        width: "100%",
+        minHeight: 0,
+    },
+});

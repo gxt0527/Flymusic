@@ -2,11 +2,10 @@ import axios from "axios";
 import { compare } from "compare-versions";
 import DeviceInfo from "react-native-device-info";
 
-const updateList = [
-    "https://gitee.com/maotoumao/MusicFree/raw/master/release/version.json",
-    "https://raw.githubusercontent.com/maotoumao/MusicFree/master/release/version.json",
-    "https://cdn.jsdelivr.net/gh/maotoumao/MusicFree@master/release/version.json",
-];
+// Fly音乐：不再使用上游 MusicFree 的发布源。
+// 保留上游地址会导致检查到「新版」后把原版 APK 下载安装，应用名被覆盖回 MusicFree。
+// 将来自建发布源时，把自有 release/version.json 地址填进这个数组即可，其余逻辑不用改。
+const updateList: string[] = [];
 
 interface IUpdateInfo {
     needUpdate: boolean;

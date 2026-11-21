@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+        <title>Fly音乐</title>
+        <style>
+            html,
+            body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                background-color: #101213;
+                overflow: hidden;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB",
+                    Roboto, Helvetica, Arial, sans-serif;
+            }
+            #root {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+            }
+            /* 隐藏滚动条但保留滚动能力 */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.12);
+                border-radius: 4px;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.2);
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            /* 不要在这里写全局 `div { scrollbar-gutter: stable }`。
+               `overflow: hidden` 同样算滚动容器，而 RN-Web 的 numberOfLines={1}
+               正是靠 `overflow:hidden + text-overflow:ellipsis` 实现的 ——
+               全局开槽会给每一个单行文本都预留 8px，右对齐的时间/数字整体左移 8px，
+               表现为「表头时长」比下面的时间靠右一格。
+               表格两侧对齐改由列表自身常驻滚动条（overflow-y: scroll）保证，见
+               components/musicList 与 pages/sheetDetail/desktop。 */
+            /* 歌词区滚动条：与歌词字号/偏移工具一致 —— 默认完全透明，
+               鼠标进入歌词区域（滚动节点 :hover）才现形。
+               宽度始终保留（scrollbar-gutter），避免出现/消失时歌词左右抖动。 */
+            .fly-lyric-scroll {
+                scrollbar-gutter: stable;
+            }
+            .fly-lyric-scroll::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            .fly-lyric-scroll::-webkit-scrollbar-thumb {
+                background: transparent;
+                border-radius: 4px;
+            }
+            .fly-lyric-scroll:hover::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.22);
+            }
+            .fly-lyric-scroll:hover::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.36);
+            }
+            .fly-lyric-scroll::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            /* 禁止文本选中，贴近原生 App 观感 */
+            * {
+                -webkit-user-select: none;
+                user-select: none;
+            }
+            input,
+            textarea {
+                -webkit-user-select: text;
+                user-select: text;
+            }
+
+            /* 键盘焦点环只给按钮等非输入控件；输入框聚焦时不画矩形方框。
+               搜索框是圆角胶囊，浏览器默认的直角 outline 会在外面套一个
+               难看的绿色方框，这里统一去掉。 */
+            :focus-visible:not(input):not(textarea) {
+                outline: 2px solid #5dd3a9;
+                outline-offset: 1px;
+            }
+            input:focus,
+            textarea:focus,
+            input:focus-visible,
+            textarea:focus-visible {
+                outline: none;
+                box-shadow: none;
+            }
+
+            /* ---------------- 无边框窗口拖拽区 ---------------- */
+            /* 顶栏整条可拖拽，内部的可交互控件自动排除 */
+            [data-testid="app-titlebar"] {
+                -webkit-app-region: drag;
+            }
+            [data-testid="app-titlebar"] [role="button"],
+            /* iconButton 渲染成裸 svg，没有 role，必须单独排除，否则点了会变成拖窗口 */
+            [data-testid="app-titlebar"] svg,
+            [data-testid="app-titlebar"] input,
+            [data-testid="window-controls"],
+            [data-testid="window-controls"] * {
+                -webkit-app-region: no-drag;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script>
+            // 早于 bundle 加载，捕获模块求值期间的异常
+            window.addEventListener("error", function (e) {
+                console.error(
+                    "[page-error]",
+                    e.message,
+                    e.error && e.error.stack ? e.error.stack : "",
+                );
+            });
+            window.addEventListener("unhandledrejection", function (e) {
+                var r = e.reason;
+                console.error(
+                    "[page-rejection]",
+                    r && (r.stack || r.message || String(r)),
+                );
+            });
+        </script>
+        <script src="./index.bundle.js"></script>
+    </body>
+</html>

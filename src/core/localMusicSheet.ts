@@ -19,7 +19,101 @@ import { ReadDirItem, exists, readDir, unlink } from "react-native-fs";
 let localSheet: IMusic.IMusicItem[] = [];
 const localSheetStateMapper = new StateMapper(() => localSheet);
 
+/**
+ * 已导入的音乐文件夹。
+ *
+ * 桌面端有了原生「选择文件夹」对话框后，用户会反复往同一个目录里丢新歌，
+ * 必须记住扫描过哪些目录，才能提供「重新扫描 / 移除目录」这类操作。
+ * 移动端同样记录（从应用内文件选择页选的目录），没有副作用。
+ */
+const folderStorageKey = "local-music-folders";
+let localFolders: string[] = [];
+const localFoldersStateMapper = new StateMapper(() => localFolders);
+
+/** Windows 下 `\` 与 `/` 混用是常态，比较前统一 */
+function normalizePath(path: string) {
+    const unified = path.replace(/\\/g, "/").replace(/\/+$/, "");
+    // UNC 路径（\\server\share）统一后是 //server/share，不能把开头的双斜杠吃掉
+    return unified.startsWith("//")
+        ? `//${unified.slice(2).replace(/\/{2,}/g, "/")}`
+        : unified.replace(/\/{2,}/g, "/");
+}
+
+function isPathInside(path: string, folder: string) {
+    const p = normalizePath(path);
+    const f = normalizePath(folder);
+    return p === f || p.startsWith(`${f}/`);
+}
+
+async function setupFolders() {
+    const stored = await getStorage(folderStorageKey);
+    localFolders = Array.isArray(stored)
+        ? stored.filter((_: any) => typeof _ === "string" && !!_)
+        : [];
+    localFoldersStateMapper.notify();
+}
+
+async function saveFolders() {
+    await setStorage(folderStorageKey, localFolders);
+    localFoldersStateMapper.notify();
+}
+
+export async function addFolders(paths: string[]) {
+    const merged = [...localFolders];
+    let changed = false;
+    paths.forEach(path => {
+        if (!path) {
+            return;
+        }
+        if (merged.some(_ => normalizePath(_) === normalizePath(path))) {
+            return;
+        }
+        merged.push(path);
+        changed = true;
+    });
+    if (changed) {
+        localFolders = merged;
+        await saveFolders();
+    }
+}
+
+/** 该文件夹下已经收录了多少首（用于展示） */
+export function getFolderMusicCount(folder: string) {
+    return localSheet.filter(musicItem => {
+        const localPath = getLocalPath(musicItem);
+        return !!localPath && isPathInside(localPath, folder);
+    }).length;
+}
+
+/**
+ * 移除文件夹：只把该目录下的歌曲从音乐库摘掉，磁盘文件不动。
+ */
+export async function removeFolder(path: string) {
+    localFolders = localFolders.filter(
+        _ => normalizePath(_) !== normalizePath(path),
+    );
+    await saveFolders();
+    const kept = localSheet.filter(musicItem => {
+        const localPath = getLocalPath(musicItem);
+        return !localPath || !isPathInside(localPath, path);
+    });
+    if (kept.length !== localSheet.length) {
+        localSheet = kept;
+        localSheetStateMapper.notify();
+        await saveLocalSheet();
+    }
+}
+
+export function getFolders() {
+    return localFolders;
+}
+
+export function useFolders() {
+    return localFoldersStateMapper.useMappedState();
+}
+
 export async function setup() {
+    await setupFolders();
     const sheet = await getStorage(StorageKeys.LocalMusicSheet);
     if (sheet) {
         let validSheet: IMusic.IMusicItem[] = [];
@@ -187,7 +281,7 @@ async function importLocal(_folderPaths: string[]) {
             return {
                 id,
                 platform,
-                title: title ?? meta?.title ?? getFileName(musicPath),
+                title: title ?? meta?.title ?? getFileName(musicPath, true),
                 artist: artist ?? meta?.artist ?? "未知歌手",
                 duration: parseInt(meta?.duration ?? "0", 10) / 1000,
                 album: meta?.album ?? "未知专辑",
@@ -243,6 +337,11 @@ async function updateMusicList(newSheet: IMusic.IMusicItem[]) {
 const LocalMusicSheet = {
     setup,
     addMusic,
+    addFolders,
+    removeFolder,
+    getFolders,
+    useFolders,
+    getFolderMusicCount,
     removeMusic,
     addMusicDraft,
     saveLocalSheet,

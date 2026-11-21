@@ -142,6 +142,52 @@ export default class SortedMusicList {
         this.removeFromCountMap(musicItems);
     }
 
+    /**
+     * 原位替换某一首歌（导入歌单匹配成功后用真实歌曲换掉占位项）。
+     * 必须同步维护 countMap，否则后续 has()/去重会认错歌。
+     */
+    replaceOne(
+        predicate: (it: IMusic.IMusicItem) => boolean,
+        next: (old: IMusic.IMusicItem) => IMusic.IMusicItem | null,
+    ) {
+        const index = this.array.findIndex(predicate);
+        if (index === -1) {
+            return false;
+        }
+        const oldItem = this.array[index];
+        const newItem = next(oldItem);
+        if (!newItem) {
+            return false;
+        }
+        this.removeFromCountMap([oldItem]);
+        this.addToCountMap([newItem]);
+        this.array = [
+            ...this.array.slice(0, index),
+            newItem,
+            ...this.array.slice(index + 1),
+        ];
+        return true;
+    }
+
+    /**
+     * 批量替换满足条件的项。只改自定义状态字段时不涉及 platform/id，
+     * countMap 无需重建；一次写库即可，避免几百首逐条 updateImportItem。
+     */
+    replaceAll(
+        predicate: (it: IMusic.IMusicItem) => boolean,
+        next: (old: IMusic.IMusicItem) => IMusic.IMusicItem,
+    ) {
+        let changed = false;
+        this.array = this.array.map(it => {
+            if (!predicate(it)) {
+                return it;
+            }
+            changed = true;
+            return next(it);
+        });
+        return changed;
+    }
+
     removeByIndex(indices: number[]) {
         const indicesSet = new Set(indices);
         const removedItems: IMusic.IMusicItem[] = [];

@@ -5,7 +5,14 @@ import rpx from "@/utils/rpx";
 import { GlobalState } from "@/utils/stateMapper";
 import { nanoid } from "nanoid";
 import React, { useCallback, useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+} from "react-native";
 import {
     Directions,
     Gesture,
@@ -20,6 +27,7 @@ import Animated, {
     withTiming,
 } from "react-native-reanimated";
 import Icon from "@/components/base/icon.tsx";
+import { useTokens } from "@/theme";
 
 export interface IToastConfig {
     /** 类型 */
@@ -47,17 +55,26 @@ const activeToastStore = new GlobalState<IToastConfigInner | null>(null);
 const typeConfig = {
     success: {
         name: "check-circle",
+        // 亮/暗主题分开取色：单一 #457236 在深色底 (#232627) 上对比不足，图标几乎糊进背景
         color: "#457236",
+        colorDark: "#5BE38F",
+        colorLight: "#12A150",
     },
     warn: {
         name: "exclamation-circle",
         color: "#de7622",
+        colorDark: "#FFB65C",
+        colorLight: "#C25E0C",
     },
 } as const;
 
 export function ToastBaseComponent() {
     const activeToast = activeToastStore.useValue();
     const colors = useColors();
+    const t = useTokens();
+    const { width: windowWidth } = useWindowDimensions();
+    /** 宽屏按桌面通知处理：不限宽 688rpx，改自适应内容宽度 */
+    const desktop = Platform.OS === "web" && windowWidth >= 600;
 
     const toastAnim = useSharedValue(0);
 
@@ -103,6 +120,13 @@ export function ToastBaseComponent() {
         .runOnJS(true);
 
     const toastAnimStyle = useAnimatedStyle(() => {
+        if (desktop) {
+            /** 桌面：窗口顶部居中，从上方轻轻落下（不是从右下角冒出来） */
+            return {
+                opacity: toastAnim.value,
+                transform: [{ translateY: (toastAnim.value - 1) * 16 }],
+            };
+        }
         return {
             transform: [
                 {
@@ -111,28 +135,39 @@ export function ToastBaseComponent() {
             ],
             opacity: toastAnim.value,
         };
-    });
+    }, [desktop]);
 
     return activeToast ? (
         <GestureDetector gesture={flingGesture}>
-            <View style={styles.container}>
+            <View style={desktop ? styles.containerDesktop : styles.container}>
                 <Animated.View
                     style={[
                         styles.contentContainer,
-                        {
-                            backgroundColor: colors.notification,
+                        desktop && styles.contentContainerDesktop,
+                        desktop && {
+                            borderColor: colors.divider ?? "rgba(128,128,128,0.3)",
                             shadowColor: colors.shadow,
                         },
+                        !desktop && { shadowColor: colors.shadow },
+                        { backgroundColor: colors.notification },
                         toastAnimStyle,
                     ]}>
                     <Icon
                         size={fontSizeConst.appbar}
                         name={typeConfig[activeToast.type].name}
-                        color={typeConfig[activeToast.type].color}
+                        color={
+                            t.isDark
+                                ? typeConfig[activeToast.type].colorDark
+                                : typeConfig[activeToast.type].colorLight
+                        }
                     />
                     <Text
                         numberOfLines={2}
-                        style={[styles.text, { color: colors.text }]}>
+                        style={[
+                            styles.text,
+                            desktop && styles.textDesktop,
+                            { color: colors.text },
+                        ]}>
                         {activeToast.message}
                     </Text>
                     {activeToast.actionText && activeToast.onActionClick ? (
@@ -162,6 +197,15 @@ const styles = StyleSheet.create({
         height: rpx(100),
         zIndex: 20000,
     },
+    /** 桌面：窗口水平居中 + 顶栏下方（与移动端同一个观感），不再贴右下角 */
+    containerDesktop: {
+        position: "absolute",
+        top: 78,
+        left: 0,
+        right: 0,
+        alignItems: "center",
+        zIndex: 20000,
+    },
     contentContainer: {
         width: rpx(688),
         height: "100%",
@@ -179,11 +223,37 @@ const styles = StyleSheet.create({
 
         elevation: 2,
     },
+    /** 桌面：宽度由内容决定，40 高、圆角 8、左右 14、细描边 */
+    contentContainerDesktop: {
+        width: "auto",
+        minWidth: 180,
+        maxWidth: 380,
+        height: 40,
+        borderRadius: 8,
+        borderWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 14,
+        shadowOffset: {
+            width: 0,
+            height: 6,
+        },
+        shadowOpacity: 0.22,
+        shadowRadius: 16,
+        elevation: 8,
+    },
     text: {
         fontSize: fontSizeConst.content,
         includeFontPadding: false,
         flex: 1,
         marginLeft: rpx(24),
+    },
+    textDesktop: {
+        /** 宽度按内容走（不能沿用移动端的 flex:1，否则卡片会被撑到最大宽度） */
+        flexGrow: 0,
+        flexShrink: 1,
+        flexBasis: "auto",
+        marginLeft: 8,
+        fontSize: 13,
+        lineHeight: 18,
     },
     actionText: {
         fontSize: fontSizeConst.content,

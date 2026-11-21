@@ -8,6 +8,10 @@ export interface ILanguageData {
     "common.other": string; // 其他
     "common.cancel": string; // 取消
     "common.about": string; // 关于
+    "common.more": string; // 更多
+    "common.collapse": string; // 收起
+    "common.unknownArtist": string; // 未知歌手
+    "common.manage": string; // 管理
     "common.batchEdit": string; // 批量编辑
     "common.selectAll": string; // 全选
     "common.unselectAll": string; // 全不选
@@ -65,6 +69,7 @@ export interface ILanguageData {
     "home.localMusic": string; // 本地音乐
     "home.openSidebar.a11y": string; // 打开侧边栏
     "home.myPlaylists": string; // 我的歌单
+    "home.continueListen": string; // 继续收听
     "home.starredPlaylists": string; // 我喜欢的歌单
     "home.newPlaylist.a11y": string; // 新建歌单
     "home.importPlaylist.a11y": string; // 导入歌单
@@ -96,12 +101,34 @@ export interface ILanguageData {
     "localMusic.scanLocalMusic": string; // 扫描本地音乐
     "localMusic.beginScan": string; // 开始扫描
     "localMusic.downloadList": string; // 下载列表
+    "localMusic.emptyTitle": string; // 还没有本地音乐
+    "localMusic.emptyDesc": string; // 选择一个文件夹…
+    "localMusic.addFolder": string; // 添加文件夹
+    "localMusic.importFoldersTitle": string; // 选择音乐文件夹
+    "localMusic.foldersCount": string; // {count} 个文件夹
+    "localMusic.songsCount": string; // {count} 首歌曲
+    "localMusic.noFolder": string; // 还没有添加文件夹
+    "localMusic.rescan": string; // 重新扫描
+    "localMusic.removeFolder": string; // 移除文件夹
+    "localMusic.removeFolderConfirm": string; // 移除确认文案
+    "localMusic.emptyDescDesktop": string; // 桌面端空态说明
+    "localMusic.supportFormat": string; // 支持的格式
+    "localMusic.openInExplorer": string; // 在资源管理器中打开
+    "localMusic.noMusicInFolder": string; // 文件夹内没有音频
+    "localMusic.scanFailed": string; // 扫描失败
 
     // 歌词相关
     "lyric.lyricLinkedFrom": string; // 歌词来自
     "lyric.unlinkLyric": string; // 取消链接歌词
     "lyric.noLyric": string; // 暂无歌词
+    "lyric.loadingLyric": string; // 正在加载歌词
     "lyric.searchLyric": string; // 搜索歌词
+
+    // 桌面播放页
+    "playerPage.lyric": string; // 歌词
+    "playerPage.album": string; // 专辑
+    "playerPage.artist": string; // 歌手
+    "playerPage.source": string; // 来源
 
     // 音乐列表编辑器相关
     "musicListEditor.selectMusicCount": string; // 选择的音乐数量
@@ -135,6 +162,12 @@ export interface ILanguageData {
 
     // 歌单详情相关
     "sheetDetail.totalMusicCount": string; // 歌曲总数
+    "sheetDetail.song": string; // Tab：歌曲
+    "sheetDetail.sheet": string; // Tab：歌单
+    "sheetDetail.album": string; // Tab：专辑
+    "sheetDetail.emptyMusic": string; // 空态：无歌曲
+    "sheetDetail.emptySheet": string; // 空态：无子歌单
+    "sheetDetail.emptyAlbum": string; // 空态：无专辑
     "sheetDetail.editSheetInfo": string; // 编辑歌单信息
     "sheetDetail.batchEditMusic": string; // 批量编辑音乐
     "sheetDetail.sortMusic": string; // 排序音乐
@@ -232,25 +265,6 @@ export interface ILanguageData {
     "themeSettings.setTheme": string; // 设置主题
     "themeSettings.lightMode": string; // 明亮模式
     "themeSettings.darkMode": string; // 黑暗模式
-    "themeSettings.customMode": string; // 自定义模式
-
-
-    // 自定义主题相关
-    "setCustomTheme.customizeBackground": string; // 自定义背景
-    "setCustomTheme.blur": string; // 模糊
-    "setCustomTheme.opacity": string; // 不透明度
-    "setCustomTheme.primaryColor": string; // 主题色
-    "setCustomTheme.textColor": string; // 文字颜色
-    "setCustomTheme.appBarColor": string; // 应用栏颜色
-    "setCustomTheme.appBarTextColor": string; // 应用栏文字色
-    "setCustomTheme.musicBarColor": string; // 音乐栏颜色
-    "setCustomTheme.musicBarTextColor": string; // 音乐栏文字色
-    "setCustomTheme.pageBackgroundColor": string; // 页面背景色
-    "setCustomTheme.backdropColor": string; // 背景色
-    "setCustomTheme.cardColor": string; // 卡片背景色
-    "setCustomTheme.placeholderColor": string; // 输入框背景色
-    "setCustomTheme.tabBarColor": string; // 导航栏背景色
-    "setCustomTheme.notificationColor": string; // 提示、tips背景色
 
     // 备份与恢复相关
     "backupAndResume.beginBackup": string; // 开始备份
@@ -280,6 +294,11 @@ export interface ILanguageData {
 
     // 基本设置相关
     "basicSettings.common": string; // 通用
+    "basicSettings.windowBehavior": string; // 窗口与后台
+    "basicSettings.closeAction": string; // 关闭按钮执行操作
+    "basicSettings.closeAction.tray": string; // 仅关闭界面
+    "basicSettings.closeAction.quit": string; // 关闭并退出
+    "basicSettings.closeActionHint": string; // 关闭行为说明
     "basicSettings.maxHistoryLength": string; // 最大历史记录长度
     "basicSettings.musicDetailDefault": string; // 音乐详情默认
     "basicSettings.musicDetailDefault.album": string; // 专辑
@@ -530,6 +549,30 @@ export interface ILanguageData {
     "repeatMode.SHUFFLE": string; // 随机播放
     "repeatMode.QUEUE": string; // 列表循环
     "repeatMode.SINGLE": string; // 单曲循环
+
+    // 导航（Fly音乐 侧栏 / 底部 Tab）
+    "nav.home": string; // 首页
+    "nav.recommendSheets": string; // 推荐歌单
+    "nav.favorite": string; // 我的收藏
+    "nav.localMusic": string; // 本地音乐
+    "nav.recentPlay": string; // 最近播放
+    "nav.musicRank": string; // 听歌排行
+
+    // Windows 设置页
+    "setting.desktop.basicDescription": string;
+    "setting.desktop.themeDescription": string;
+    "setting.desktop.aboutDescription": string;
+    "setting.cache.limitDescription": string;
+    "setting.cache.musicDescription": string;
+    "setting.cache.lyricDescription": string;
+    "setting.cache.imageDescription": string;
+    "setting.cache.clearFailed": string;
+    "setting.cache.location": string;
+    "setting.cache.locationDescription": string;
+    "setting.cache.openFolder": string;
+    "setting.about.basedOnPrefix": string;
+    "setting.about.licenseSuffix": string;
+    "setting.about.sourceLabel": string;
 }
 
 // 语言接口定义

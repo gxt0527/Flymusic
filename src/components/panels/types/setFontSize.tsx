@@ -4,6 +4,7 @@ import rpx from "@/utils/rpx";
 import ThemeText from "@/components/base/themeText";
 
 import PanelBase from "../base/panelBase";
+import type { IPanelAnchor } from "../anchor";
 import Slider from "@react-native-community/slider";
 import useColors from "@/hooks/useColors";
 import PanelHeader from "../base/panelHeader";
@@ -11,6 +12,10 @@ import { useI18N } from "@/core/i18n";
 
 interface IProps {
     defaultSelect?: number;
+    /** 桌面端：挂在触发按钮上展开（移动端忽略） */
+    anchor?: IPanelAnchor;
+    /** 桌面端：常驻深色页面上强制深色菜单 */
+    dark?: boolean;
     /** 点击回调 */
     onSelectChange: (value: number) => void;
 }

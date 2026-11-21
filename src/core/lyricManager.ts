@@ -34,6 +34,14 @@ const defaultLyricState = {
 
 const lyricStateAtom = atom<ILyricState>(defaultLyricState);
 const currentLyricItemAtom = atom<IParsedLrcItem | null>(null);
+/**
+ * 手动跳转进度（点/拖进度条）后自增。
+ *
+ * 歌词列表据此「立刻」快滑到目标行：正常播放时进度事件一秒才来一次，
+ * 暂停时更是一次都不来，只靠 currentLyricItem 变化会出现
+ * 「点了进度条，歌词还停在原处」的情况。
+ */
+const lyricSeekVersionAtom = atom(0);
 
 
 class LyricManager implements IInjectable {
@@ -69,7 +77,7 @@ class LyricManager implements IInjectable {
                     LyricUtil.setStatusBarLyricText(
                         `${musicItem.title} - ${musicItem.artist}`,);
                 } else {
-                    LyricUtil.setStatusBarLyricText("MusicFree");
+                    LyricUtil.setStatusBarLyricText("Fly音乐");
                 }
             }
         });
@@ -114,12 +122,35 @@ class LyricManager implements IInjectable {
                 fontSize: this.appConfig.getConfig("lyric.fontSize"),
             };
             LyricUtil.showStatusBarLyric(
-                "MusicFree",
+                "Fly音乐",
                 statusBarLyricConfig ?? {}
             );
         }
 
         this.refreshLyric(true);
+    }
+
+    /**
+     * 进度被手动跳转（点/拖进度条）后调用。
+     *
+     * 做两件事：
+     *   1. 按新位置立刻重算当前歌词行（不等 timeupdate / 进度事件）
+     *   2. 递增 seekVersion，通知歌词列表快滑到该行（暂停状态同样生效）
+     *
+     * @param position 目标位置（秒）；不传则读一次当前播放进度
+     */
+    async syncProgress(position?: number) {
+        const parser = this.lyricParser;
+        if (parser && this.trackPlayer.isCurrentMusic(parser.musicItem)) {
+            let pos = position;
+            if (typeof pos !== "number") {
+                pos = (await this.trackPlayer.getProgress().catch(() => null))?.position;
+            }
+            if (typeof pos === "number") {
+                getDefaultStore().set(currentLyricItemAtom, parser.getPosition(pos) ?? null);
+            }
+        }
+        getDefaultStore().set(lyricSeekVersionAtom, v => v + 1);
     }
 
     associateLyric(musicItem: IMusic.IMusicItem, linkToMusicItem: ICommon.IMediaBase) {
@@ -242,7 +273,7 @@ class LyricManager implements IInjectable {
         getDefaultStore().set(currentLyricItemAtom, null);
         if (this.appConfig.getConfig("lyric.showStatusBarLyric")) {
             const musicItem = this.trackPlayer.currentMusic;
-            LyricUtil.setStatusBarLyricText(musicItem ? `${musicItem.title} - ${musicItem.artist}` : "MusicFree");
+            LyricUtil.setStatusBarLyricText(musicItem ? `${musicItem.title} - ${musicItem.artist}` : "Fly音乐");
         }
     }
 
@@ -321,7 +352,7 @@ class LyricManager implements IInjectable {
                     );
                 } else {
                     const musicItem = this.trackPlayer.currentMusic;
-                    LyricUtil.setStatusBarLyricText(musicItem ? `${musicItem.title} - ${musicItem.artist}` : "MusicFree");
+                    LyricUtil.setStatusBarLyricText(musicItem ? `${musicItem.title} - ${musicItem.artist}` : "Fly音乐");
                 }
             }
         } catch (err) {
@@ -408,3 +439,5 @@ export default lyricManager;
 
 export const useLyricState = () => useAtomValue(lyricStateAtom);
 export const useCurrentLyricItem = () => useAtomValue(currentLyricItemAtom);
+/** 手动跳转进度的序号：变化时歌词列表应立即快滑到当前行 */
+export const useLyricSeekVersion = () => useAtomValue(lyricSeekVersionAtom);

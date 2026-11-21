@@ -5,6 +5,7 @@ import ThemeText from "@/components/base/themeText";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PanelBase from "../base/panelBase";
+import type { IPanelAnchor } from "../anchor";
 import { ScrollView } from "react-native-gesture-handler";
 import { hidePanel } from "../usePanel";
 import Divider from "@/components/base/divider";
@@ -12,6 +13,10 @@ import PanelHeader from "../base/panelHeader";
 import { useI18N } from "@/core/i18n";
 
 interface IPlayRateProps {
+    /** 桌面端：挂在触发按钮上展开（移动端忽略） */
+    anchor?: IPanelAnchor;
+    /** 当前倍速（×100），桌面端用于打勾 */
+    currentRate?: number;
     /** 点击回调 */
     onRatePress: (rate: number) => void;
 }

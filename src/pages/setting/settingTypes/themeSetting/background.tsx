@@ -1,84 +1,22 @@
+/**
+ * 主题设置：只保留浅色 / 深色两套预设。
+ *
+ * 自定义背景（背景图 + 逐项配色）已移除：桌面端拿不到相册选择器，
+ * 逐项配色又容易把控件对比度调到不可用，1.0.0 起不再提供。
+ */
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import rpx from "@/utils/rpx";
 import ThemeText from "@/components/base/themeText";
-// import pathConst from '@/constants/pathConst';
 import Config, { useAppConfig } from "@/core/appConfig";
 import ThemeCard from "./themeCard";
-import { ROUTE_PATH, useNavigate } from "@/core/router";
 import Theme from "@/core/theme";
 import { useI18N } from "@/core/i18n";
 
 export default function Background() {
     const { t } = useI18N();
 
-    const themeBackground = useAppConfig("theme.background");
     const themeSelectedTheme = useAppConfig("theme.selectedTheme");
-
-    const navigate = useNavigate();
-
-    // const onCustomBgPress = async () => {
-    //     try {
-    //         const result = await launchImageLibrary({
-    //             mediaType: 'photo',
-    //         });
-    //         const uri = result.assets?.[0].uri;
-    //         if (!uri) {
-    //             return;
-    //         }
-
-    //         const bgPath = `${pathConst.dataPath}background${uri.substring(
-    //             uri.lastIndexOf('.'),
-    //         )}`;
-    //         await copyFile(uri, bgPath);
-    //         Config.set(
-    //             'setting.theme.background',
-    //             `file://${bgPath}#${Date.now()}`,
-    //         );
-
-    //         const colorsResult = await ImageColors.getColors(uri, {
-    //             fallback: '#ffffff',
-    //         });
-    //         const colors = {
-    //             primary:
-    //                 colorsResult.platform === 'android'
-    //                     ? colorsResult.dominant
-    //                     : colorsResult.platform === 'ios'
-    //                     ? colorsResult.primary
-    //                     : colorsResult.vibrant,
-    //             average:
-    //                 colorsResult.platform === 'android'
-    //                     ? colorsResult.average
-    //                     : colorsResult.platform === 'ios'
-    //                     ? colorsResult.detail
-    //                     : colorsResult.dominant,
-    //             vibrant:
-    //                 colorsResult.platform === 'android'
-    //                     ? colorsResult.vibrant
-    //                     : colorsResult.platform === 'ios'
-    //                     ? colorsResult.secondary
-    //                     : colorsResult.vibrant,
-    //         };
-    //         const primaryColor = Color(colors.primary).darken(0.3).toString();
-    //         // const secondaryColor = Color(colors.average)
-    //         //   .darken(0.3)
-    //         //   .toString();
-    //         const textHighlight = Color(
-    //             0xffffff - Color(primaryColor).rgbNumber(),
-    //             'rgb',
-    //         )
-    //             .saturate(0.5)
-    //             .toString();
-    //         Config.set('setting.theme.mode', 'custom-dark');
-    //         Config.set('setting.theme.colors', {
-    //             primary: primaryColor,
-    //             textHighlight: textHighlight,
-    //             accent: textHighlight,
-    //         });
-    //     } catch (e) {
-    //         console.log(e);
-    //     }
-    // };
 
     return (
         <View>
@@ -111,37 +49,6 @@ export default function Background() {
                         }
                     }}
                 />
-
-                <ThemeCard
-                    title={t("themeSettings.customMode")}
-                    selected={themeSelectedTheme === "custom"}
-                    preview={themeBackground}
-                    onPress={() => {
-                        if (themeSelectedTheme !== "custom") {
-                            Config.setConfig("theme.followSystem", false);
-                            Theme.setTheme("custom", {
-                                colors: Config.getConfig(
-                                    "theme.customColors",
-                                ),
-                            });
-                        }
-                        navigate(ROUTE_PATH.SET_CUSTOM_THEME);
-                        // showPanel('ColorPicker');
-                    }}
-                />
-
-                {/* <ImageCard
-                    emptySrc={ImgAsset.backgroundDefault}
-                    onPress={() => {
-                        Config.set('setting.theme.background', undefined);
-                        Config.set('setting.theme.colors', undefined);
-                    }}
-                />
-                <ImageCard
-                    uri={theme?.background}
-                    emptySrc={ImgAsset.addBackground}
-                    onPress={onCustomBgPress}
-                /> */}
             </View>
         </View>
     );
